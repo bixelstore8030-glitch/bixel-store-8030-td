@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>BIXEL STORE ADMIN</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+
+<style>
+
+body{
+background:#111827;
+color:white;
+font-family:Arial;
+text-align:center;
+}
+
+.box{
+background:#1f2937;
+padding:20px;
+margin:20px;
+border-radius:10px;
+}
+
+input{
+padding:10px;
+margin:5px;
+}
+
+button{
+padding:10px;
+margin:5px;
+cursor:pointer;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>BIXEL STORE 8030 TD - ADMIN</h1>
+
+<div class="box">
+
+<h2>Wallet Control</h2>
+
+<input id="userid" placeholder="user id">
+<br>
+
+<input id="usd" placeholder="usd amount">
+
+<br>
+
+<button onclick="addUSD()">ADD USD</button>
+
+<button onclick="removeUSD()">REMOVE USD</button>
+
+</div>
+
+<div class="box">
+
+<h2>Market Control</h2>
+
+<input id="price" placeholder="BX price">
+
+<br>
+
+<button onclick="setPrice()">SET PRICE</button>
+
+<button onclick="pump()">PUMP ↑</button>
+
+<button onclick="dump()">DUMP ↓</button>
+
+</div>
+
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC_i-RZQXxwOYCLWBgleHbPK-FfFIcwX5E",
+  authDomain: "bixel-store-8030-td.firebaseapp.com",
+  projectId: "bixel-store-8030-td",
+  storageBucket: "bixel-store-8030-td.firebasestorage.app",
+  messagingSenderId: "639836655827",
+  appId: "1:639836655827:web:c20bc92778f75dc2544426"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.firestore();
+
+function addUSD(){
+
+let id=document.getElementById("userid").value
+let amount=parseFloat(document.getElementById("usd").value)
+
+db.collection("users").doc(id).get().then(doc=>{
+
+let data=doc.data()
+
+db.collection("users").doc(id).update({
+
+usd:data.usd+amount
+
+})
+
+})
+
+}
+
+function removeUSD(){
+
+let id=document.getElementById("userid").value
+let amount=parseFloat(document.getElementById("usd").value)
+
+db.collection("users").doc(id).get().then(doc=>{
+
+let data=doc.data()
+
+db.collection("users").doc(id).update({
+
+usd:data.usd-amount
+
+})
+
+})
+
+}
+
+function setPrice(){
+
+let p=parseFloat(document.getElementById("price").value)
+
+db.collection("market").doc("bxprice").update({
+
+price:p
+
+})
+
+}
+
+function pump(){
+
+db.collection("market").doc("bxprice").get().then(doc=>{
+
+let data=doc.data()
+
+db.collection("market").doc("bxprice").update({
+
+price:data.price+0.1
+
+})
+
+})
+
+}
+
+function dump(){
+
+db.collection("market").doc("bxprice").get().then(doc=>{
+
+let data=doc.data()
+
+db.collection("market").doc("bxprice").update({
+
+price:data.price-0.1
+
+})
+
+})
+
+}
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>BIXEL STORE 8030 TD</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+background:#0f172a;
+color:white;
+font-family:Arial;
+text-align:center;
+}
+
+.box{
+background:#1e293b;
+padding:20px;
+margin:20px;
+border-radius:10px;
+}
+
+input{
+padding:10px;
+margin:5px;
+}
+
+button{
+padding:10px;
+margin:5px;
+cursor:pointer;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>BIXEL STORE 8030 TD</h1>
+
+<div class="box">
+
+<h2>Login</h2>
+
+<input id="username" placeholder="username"><br>
+<input id="password" type="password" placeholder="password"><br>
+
+<button onclick="login()">Login</button>
+
+</div>
+
+<div id="panel" style="display:none">
+
+<div class="box">
+
+<h2>Wallet</h2>
+
+USD : <span id="usd">0</span><br>
+BX : <span id="bx">0</span><br>
+BX PRICE : <span id="price">0</span>
+
+</div>
+
+<div class="box">
+
+<h2>Trade</h2>
+
+<input id="amount" placeholder="amount">
+
+<br>
+
+<button onclick="buy()">BUY BX</button>
+
+<button onclick="sell()">SELL BX</button>
+
+</div>
+
+<div class="box">
+
+<h2>Chart</h2>
+
+<canvas id="chart"></canvas>
+
+</div>
+
+</div>
+
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC_i-RZQXxwOYCLWBgleHbPK-FfFIcwX5E",
+  authDomain: "bixel-store-8030-td.firebaseapp.com",
+  projectId: "bixel-store-8030-td",
+  storageBucket: "bixel-store-8030-td.firebasestorage.app",
+  messagingSenderId: "639836655827",
+  appId: "1:639836655827:web:c20bc92778f75dc2544426"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.firestore();
+
+let currentUser=null;
+let price=1;
+
+function login(){
+
+let u=document.getElementById("username").value
+let p=document.getElementById("password").value
+
+db.collection("users").get().then(snapshot=>{
+
+snapshot.forEach(doc=>{
+
+let data=doc.data()
+
+if(data.username==u && data.password==p){
+
+currentUser=doc.id
+
+document.getElementById("panel").style.display="block"
+
+loadWallet()
+
+}
+
+})
+
+})
+
+}
+
+function loadWallet(){
+
+db.collection("users").doc(currentUser).onSnapshot(doc=>{
+
+let data=doc.data()
+
+document.getElementById("usd").innerText=data.usd
+document.getElementById("bx").innerText=data.bx
+
+})
+
+}
+
+function loadPrice(){
+
+db.collection("market").doc("bxprice").onSnapshot(doc=>{
+
+price=doc.data().price
+
+document.getElementById("price").innerText=price
+
+updateChart(price)
+
+})
+
+}
+
+function buy(){
+
+let amount=parseFloat(document.getElementById("amount").value)
+
+db.collection("users").doc(currentUser).get().then(doc=>{
+
+let data=doc.data()
+
+let cost=amount*price
+
+if(data.usd>=cost){
+
+db.collection("users").doc(currentUser).update({
+
+usd:data.usd-cost,
+bx:data.bx+amount
+
+})
+
+}
+
+})
+
+}
+
+function sell(){
+
+let amount=parseFloat(document.getElementById("amount").value)
+
+db.collection("users").doc(currentUser).get().then(doc=>{
+
+let data=doc.data()
+
+if(data.bx>=amount){
+
+db.collection("users").doc(currentUser).update({
+
+usd:data.usd+(amount*price),
+bx:data.bx-amount
+
+})
+
+}
+
+})
+
+}
+
+let chart=new Chart(document.getElementById("chart"),{
+
+type:"line",
+
+data:{
+labels:[],
+datasets:[{
+label:"BX PRICE",
+data:[]
+}]
+}
+
+})
+
+function updateChart(p){
+
+chart.data.labels.push("t")
+chart.data.datasets[0].data.push(p)
+
+chart.update()
+
+}
+
+loadPrice()
+
+</script>
+
+</body>
+</html>
