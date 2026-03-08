@@ -131,7 +131,6 @@ let candleInterval=1000
 let smaPeriod=10
 let timer=null
 
-// إنشاء الرسم
 function createChart(){
 
 const chartDiv=document.getElementById("marketChart")
@@ -165,7 +164,6 @@ candleChart.applyOptions({width:chartDiv.clientWidth})
 
 }
 
-// حساب SMA
 function calcSMA(period){
 
 if(candles.length<period)return[]
@@ -191,7 +189,6 @@ return result
 
 }
 
-// تحديث الشمعة
 function updateCandle(price){
 
 let time=Math.floor(Date.now()/1000)
@@ -224,7 +221,6 @@ smaSeries.setData(calcSMA(smaPeriod))
 
 }
 
-// تغيير الإطار الزمني
 function changeTimeframe(tf){
 
 switch(tf){
@@ -242,7 +238,6 @@ restartTimer()
 
 }
 
-// تغيير SMA
 function setSMA(p){
 
 smaPeriod=p
@@ -250,7 +245,6 @@ smaSeries.setData(calcSMA(smaPeriod))
 
 }
 
-// تشغيل المؤقت
 function startTimer(){
 
 if(timer)clearInterval(timer)
@@ -262,7 +256,6 @@ db.collection("market").doc("bxprice").get().then(doc=>{
 if(doc.exists){
 
 let price=doc.data().price
-
 updateCandle(price)
 
 }
@@ -280,22 +273,30 @@ startTimer()
 
 }
 
-// إدارة المستخدمين
+/* إصلاح إضافة الدولار */
+
 function addUSD(){
 
 let id=document.getElementById("userid").value.trim()
 let amount=parseFloat(document.getElementById("usd").value)
 
+if(!id || isNaN(amount)){
+alert("ادخل بيانات صحيحة")
+return
+}
+
 db.collection("users").doc(id).get().then(doc=>{
 
 if(doc.exists){
 
-let current=doc.data().usd||0
+let current=doc.data().usd || 0
 
 db.collection("users").doc(id).update({
-usd:current+amount
+usd: current + amount
 })
 
+}else{
+alert("المستخدم غير موجود")
 }
 
 })
@@ -307,16 +308,23 @@ function removeUSD(){
 let id=document.getElementById("userid").value.trim()
 let amount=parseFloat(document.getElementById("usd").value)
 
+if(!id || isNaN(amount)){
+alert("ادخل بيانات صحيحة")
+return
+}
+
 db.collection("users").doc(id).get().then(doc=>{
 
 if(doc.exists){
 
-let current=doc.data().usd||0
+let current=doc.data().usd || 0
 
 db.collection("users").doc(id).update({
-usd:current-amount
+usd: current - amount
 })
 
+}else{
+alert("المستخدم غير موجود")
 }
 
 })
@@ -327,14 +335,20 @@ function deleteUser(){
 
 let id=document.getElementById("userid").value.trim()
 
+if(!id){
+alert("ادخل معرف المستخدم")
+return
+}
+
 db.collection("users").doc(id).delete()
 
 }
 
-// السوق
 function setPrice(){
 
 let p=parseFloat(document.getElementById("price").value)
+
+if(isNaN(p)) return
 
 db.collection("market").doc("bxprice").set({price:p})
 
@@ -364,7 +378,6 @@ db.collection("market").doc("bxprice").update({price:p})
 
 }
 
-// المستخدمين
 function loadUsers(){
 
 db.collection("users").onSnapshot(snapshot=>{
@@ -392,7 +405,6 @@ updateUsersChart(snapshot)
 
 }
 
-// رسم المستخدمين
 const usersChart=LightweightCharts.createChart(document.getElementById('usersChart'),{
 width:600,
 height:300,
