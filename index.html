@@ -166,16 +166,12 @@ alert("المستخدم موجود");
 else{
 
 db.collection("users").doc(u).set({
-
 username:u,
 password:p,
 usd:0,
 bx:0
-
 }).then(()=>{
-
 alert("تم إنشاء الحساب");
-
 });
 
 }
@@ -198,21 +194,14 @@ currentUser=u;
 document.getElementById("panel").style.display="block";
 
 loadWallet();
-
 loadPrice();
-
 loadUsersChart();
-
 initializeCandlestickChart();
-
 startCandleTimer();
 
 }
-
 else{
-
 alert("خطأ تسجيل الدخول");
-
 }
 
 });
@@ -226,7 +215,6 @@ db.collection("users").doc(currentUser).onSnapshot(doc=>{
 let data=doc.data();
 
 document.getElementById("usd").innerText=data.usd;
-
 document.getElementById("bx").innerText=data.bx;
 
 });
@@ -238,7 +226,6 @@ function loadPrice(){
 db.collection("market").doc("bxprice").onSnapshot(doc=>{
 
 price=doc.data().price;
-
 document.getElementById("price").innerText=price;
 
 });
@@ -252,20 +239,14 @@ db.collection("users").get().then(snapshot=>{
 let totalBX=0;
 
 snapshot.forEach(doc=>{
-
 totalBX+=doc.data().bx;
-
 });
 
 let newPrice=parseFloat((1+(50-totalBX)/500).toFixed(2));
 
 if(newPrice<0.1) newPrice=0.1;
 
-db.collection("market").doc("bxprice").set({
-
-price:newPrice
-
-});
+db.collection("market").doc("bxprice").set({price:newPrice});
 
 });
 
@@ -276,38 +257,26 @@ function buy(){
 let amount=parseFloat(document.getElementById("amount").value);
 
 if(!amount || amount<=0){
-
 alert("ادخل رقم صحيح");
-
 return;
-
 }
 
 db.collection("users").doc(currentUser).get().then(doc=>{
 
 let data=doc.data();
-
 let cost=amount*price;
 
 if(data.usd>=cost){
 
 db.collection("users").doc(currentUser).update({
-
 usd:data.usd-cost,
 bx:data.bx+amount
-
 }).then(()=>{
-
 updateMarketPriceSmart();
-
 });
 
-}
-
-else{
-
+}else{
 alert("لا يوجد دولار كافي");
-
 }
 
 });
@@ -319,11 +288,8 @@ function sell(){
 let amount=parseFloat(document.getElementById("amount").value);
 
 if(!amount || amount<=0){
-
 alert("ادخل رقم صحيح");
-
 return;
-
 }
 
 db.collection("users").doc(currentUser).get().then(doc=>{
@@ -333,22 +299,14 @@ let data=doc.data();
 if(data.bx>=amount){
 
 db.collection("users").doc(currentUser).update({
-
 usd:data.usd+(amount*price),
 bx:data.bx-amount
-
 }).then(()=>{
-
 updateMarketPriceSmart();
-
 });
 
-}
-
-else{
-
+}else{
 alert("لا يوجد BX");
-
 }
 
 });
@@ -382,21 +340,15 @@ if(!dataset){
 let color='hsl('+Math.random()*360+',70%,50%)';
 
 usersChart.data.datasets.push({
-
 label:data.username,
 data:[data.bx],
 borderColor:color,
 backgroundColor:color,
 fill:false
-
 });
 
-}
-
-else{
-
+}else{
 dataset.data.push(data.bx);
-
 }
 
 });
@@ -418,7 +370,6 @@ height:400
 });
 
 candleSeries=candleChart.addCandlestickSeries();
-
 smaSeries=candleChart.addLineSeries({color:'#FFD700'});
 
 }
@@ -434,16 +385,12 @@ for(let i=period-1;i<candles.length;i++){
 let sum=0;
 
 for(let j=i-period+1;j<=i;j++){
-
 sum+=candles[j].close;
-
 }
 
 sma.push({
-
 time:candles[i].time,
 value:sum/period
-
 });
 
 }
@@ -461,34 +408,29 @@ if(candles.length===0 || timestamp>candles[candles.length-1].time){
 let open=candles.length===0?newPrice:candles[candles.length-1].close;
 
 candles.push({
-
 time:timestamp,
 open:open,
 high:newPrice,
 low:newPrice,
 close:newPrice
-
 });
 
-}
-
-else{
+}else{
 
 let last=candles[candles.length-1];
 
 last.high=Math.max(last.high,newPrice);
-
 last.low=Math.min(last.low,newPrice);
-
 last.close=newPrice;
 
 }
 
 candleSeries.setData(candles);
-
 smaSeries.setData(calculateSMA(smaPeriod));
 
 }
+
+/* الإصلاح: الشموع تقرأ السعر فقط */
 
 function startCandleTimer(){
 
@@ -496,17 +438,17 @@ if(candleTimer) clearInterval(candleTimer);
 
 candleTimer=setInterval(()=>{
 
-let change=(Math.random()*0.02-0.01);
+db.collection("market").doc("bxprice").get().then(doc=>{
 
-price=parseFloat((price*(1+change)).toFixed(2));
+if(doc.exists){
 
-db.collection("market").doc("bxprice").set({
+let currentPrice=doc.data().price;
 
-price:price
+addOrUpdateCandle(currentPrice);
+
+}
 
 });
-
-addOrUpdateCandle(price);
 
 },candleInterval);
 
@@ -515,7 +457,6 @@ addOrUpdateCandle(price);
 function restartCandleTimer(){
 
 clearInterval(candleTimer);
-
 startCandleTimer();
 
 }
@@ -541,7 +482,6 @@ restartCandleTimer();
 function setSMA(period){
 
 smaPeriod=period;
-
 smaSeries.setData(calculateSMA(smaPeriod));
 
 }
