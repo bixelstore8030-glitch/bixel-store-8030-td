@@ -1,108 +1,302 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>BIXEL STORE ADMIN</title>
+<title>منصة BIXEL STORE 8030 TD - لوحة الإدارة</title>
 
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
 
 <style>
-
 body{
 background:#111827;
 color:white;
 font-family:Arial;
 text-align:center;
+direction:rtl;
 }
-
 .box{
 background:#1f2937;
 padding:20px;
 margin:20px;
 border-radius:10px;
 }
-
 input{
 padding:10px;
 margin:5px;
 }
-
 button{
 padding:10px;
 margin:5px;
 cursor:pointer;
+background:#f0b90b;
+border:none;
 }
-
+#usersTable{
+width:90%;
+margin:auto;
+border-collapse:collapse;
+margin-top:20px;
+}
+#usersTable th,#usersTable td{
+border:1px solid #444;
+padding:8px;
+color:white;
+}
+#marketChart{
+height:400px;
+margin:20px auto;
+}
+#usersChart{
+height:300px;
+margin:20px auto;
+}
 </style>
 </head>
 
 <body>
 
-<h1>BIXEL STORE 8030 TD - ADMIN</h1>
+<h1>منصة BIXEL STORE 8030 TD - لوحة الإدارة</h1>
 
 <div class="box">
-
-<h2>Wallet Control</h2>
-
-<input id="userid" placeholder="user id">
-<br>
-
-<input id="usd" placeholder="usd amount">
-
-<br>
-
-<button onclick="addUSD()">ADD USD</button>
-
-<button onclick="removeUSD()">REMOVE USD</button>
-
+<h2>إدارة المحفظة</h2>
+<input id="userid" placeholder="معرف المستخدم"><br>
+<input id="usd" placeholder="مقدار الدولار"><br>
+<button onclick="addUSD()">إضافة دولار</button>
+<button onclick="removeUSD()">سحب دولار</button>
+<button onclick="deleteUser()">حذف المستخدم</button>
 </div>
 
 <div class="box">
+<h2>إدارة السوق</h2>
+<input id="price" placeholder="سعر BX"><br>
+<button onclick="setPrice()">تعيين السعر</button>
+<button onclick="pump()">رفع السعر ↑</button>
+<button onclick="dump()">خفض السعر ↓</button>
+</div>
 
-<h2>Market Control</h2>
+<div class="box">
+<h2>قائمة المستخدمين</h2>
+<table id="usersTable">
+<tr><th>معرف المستخدم</th><th>اسم المستخدم</th><th>دولار</th><th>BX</th></tr>
+</table>
+</div>
 
-<input id="price" placeholder="BX price">
+<div class="box">
+<h2>الرسم البياني للسوق</h2>
 
-<br>
+<button onclick="changeTimeframe('1s')">1 ثانية</button>
+<button onclick="changeTimeframe('1m')">1 دقيقة</button>
+<button onclick="changeTimeframe('1h')">1 ساعة</button>
+<button onclick="changeTimeframe('4h')">4 ساعات</button>
+<button onclick="changeTimeframe('1d')">1 يوم</button>
+<button onclick="changeTimeframe('1w')">1 أسبوع</button>
 
-<button onclick="setPrice()">SET PRICE</button>
+<br><br>
 
-<button onclick="pump()">PUMP ↑</button>
+<button onclick="setSMA(5)">SMA 5</button>
+<button onclick="setSMA(10)">SMA 10</button>
+<button onclick="setSMA(20)">SMA 20</button>
+<button onclick="setSMA(50)">SMA 50</button>
+<button onclick="setSMA(100)">SMA 100</button>
 
-<button onclick="dump()">DUMP ↓</button>
+<div id="marketChart"></div>
+</div>
 
+<div class="box">
+<h2>الرسم البياني للمستخدمين</h2>
+<div id="usersChart"></div>
 </div>
 
 <script>
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC_i-RZQXxwOYCLWBgleHbPK-FfFIcwX5E",
-  authDomain: "bixel-store-8030-td.firebaseapp.com",
-  projectId: "bixel-store-8030-td",
-  storageBucket: "bixel-store-8030-td.firebasestorage.app",
-  messagingSenderId: "639836655827",
-  appId: "1:639836655827:web:c20bc92778f75dc2544426"
+apiKey: "AIzaSyC_i-RZQXxwOYCLWBgleHbPK-FfFIcwX5E",
+authDomain: "bixel-store-8030-td.firebaseapp.com",
+projectId: "bixel-store-8030-td",
+storageBucket: "bixel-store-8030-td.firebasestorage.app",
+messagingSenderId: "639836655827",
+appId: "1:639836655827:web:c20bc92778f75dc2544426"
 };
 
 firebase.initializeApp(firebaseConfig);
-
 const db = firebase.firestore();
 
+let candleChart
+let candleSeries
+let smaSeries
+let candles=[]
+let candleInterval=1000
+let smaPeriod=10
+let timer=null
+
+// إنشاء الرسم
+function createChart(){
+
+const chartDiv=document.getElementById("marketChart")
+
+candleChart = LightweightCharts.createChart(chartDiv,{
+layout:{background:{color:"#111827"},textColor:"#DDD"},
+grid:{vertLines:{color:"#1f2937"},horzLines:{color:"#1f2937"}},
+rightPriceScale:{borderColor:"#1f2937"},
+timeScale:{borderColor:"#1f2937",timeVisible:true,secondsVisible:true},
+width:chartDiv.clientWidth,
+height:400
+})
+
+candleSeries = candleChart.addCandlestickSeries({
+upColor:"#4CAF50",
+downColor:"#F44336",
+borderUpColor:"#4CAF50",
+borderDownColor:"#F44336",
+wickUpColor:"#4CAF50",
+wickDownColor:"#F44336"
+})
+
+smaSeries = candleChart.addLineSeries({
+color:"#FFD700",
+lineWidth:2
+})
+
+window.addEventListener("resize",()=>{
+candleChart.applyOptions({width:chartDiv.clientWidth})
+})
+
+}
+
+// حساب SMA
+function calcSMA(period){
+
+if(candles.length<period)return[]
+
+let result=[]
+
+for(let i=period-1;i<candles.length;i++){
+
+let sum=0
+
+for(let j=i-period+1;j<=i;j++){
+sum+=candles[j].close
+}
+
+result.push({
+time:candles[i].time,
+value:sum/period
+})
+
+}
+
+return result
+
+}
+
+// تحديث الشمعة
+function updateCandle(price){
+
+let time=Math.floor(Date.now()/1000)
+
+if(candles.length==0 || time>candles[candles.length-1].time){
+
+let open=candles.length==0?price:candles[candles.length-1].close
+
+candles.push({
+time:time,
+open:open,
+high:price,
+low:price,
+close:price
+})
+
+}else{
+
+let last=candles[candles.length-1]
+
+last.high=Math.max(last.high,price)
+last.low=Math.min(last.low,price)
+last.close=price
+
+}
+
+candleSeries.setData(candles)
+
+smaSeries.setData(calcSMA(smaPeriod))
+
+}
+
+// تغيير الإطار الزمني
+function changeTimeframe(tf){
+
+switch(tf){
+
+case "1s": candleInterval=1000; break
+case "1m": candleInterval=60000; break
+case "1h": candleInterval=3600000; break
+case "4h": candleInterval=14400000; break
+case "1d": candleInterval=86400000; break
+case "1w": candleInterval=604800000; break
+
+}
+
+restartTimer()
+
+}
+
+// تغيير SMA
+function setSMA(p){
+
+smaPeriod=p
+smaSeries.setData(calcSMA(smaPeriod))
+
+}
+
+// تشغيل المؤقت
+function startTimer(){
+
+if(timer)clearInterval(timer)
+
+timer=setInterval(()=>{
+
+db.collection("market").doc("bxprice").get().then(doc=>{
+
+if(doc.exists){
+
+let price=doc.data().price
+
+updateCandle(price)
+
+}
+
+})
+
+},candleInterval)
+
+}
+
+function restartTimer(){
+
+clearInterval(timer)
+startTimer()
+
+}
+
+// إدارة المستخدمين
 function addUSD(){
 
-let id=document.getElementById("userid").value
+let id=document.getElementById("userid").value.trim()
 let amount=parseFloat(document.getElementById("usd").value)
 
 db.collection("users").doc(id).get().then(doc=>{
 
-let data=doc.data()
+if(doc.exists){
+
+let current=doc.data().usd||0
 
 db.collection("users").doc(id).update({
-
-usd:data.usd+amount
-
+usd:current+amount
 })
+
+}
 
 })
 
@@ -110,32 +304,39 @@ usd:data.usd+amount
 
 function removeUSD(){
 
-let id=document.getElementById("userid").value
+let id=document.getElementById("userid").value.trim()
 let amount=parseFloat(document.getElementById("usd").value)
 
 db.collection("users").doc(id).get().then(doc=>{
 
-let data=doc.data()
+if(doc.exists){
+
+let current=doc.data().usd||0
 
 db.collection("users").doc(id).update({
-
-usd:data.usd-amount
-
+usd:current-amount
 })
+
+}
 
 })
 
 }
 
+function deleteUser(){
+
+let id=document.getElementById("userid").value.trim()
+
+db.collection("users").doc(id).delete()
+
+}
+
+// السوق
 function setPrice(){
 
 let p=parseFloat(document.getElementById("price").value)
 
-db.collection("market").doc("bxprice").update({
-
-price:p
-
-})
+db.collection("market").doc("bxprice").set({price:p})
 
 }
 
@@ -143,13 +344,9 @@ function pump(){
 
 db.collection("market").doc("bxprice").get().then(doc=>{
 
-let data=doc.data()
+let p=doc.data().price+0.1
 
-db.collection("market").doc("bxprice").update({
-
-price:data.price+0.1
-
-})
+db.collection("market").doc("bxprice").update({price:p})
 
 })
 
@@ -159,17 +356,77 @@ function dump(){
 
 db.collection("market").doc("bxprice").get().then(doc=>{
 
-let data=doc.data()
+let p=doc.data().price-0.1
 
-db.collection("market").doc("bxprice").update({
-
-price:data.price-0.1
-
-})
+db.collection("market").doc("bxprice").update({price:p})
 
 })
 
 }
+
+// المستخدمين
+function loadUsers(){
+
+db.collection("users").onSnapshot(snapshot=>{
+
+let table=document.getElementById("usersTable")
+
+table.innerHTML="<tr><th>معرف المستخدم</th><th>اسم المستخدم</th><th>دولار</th><th>BX</th></tr>"
+
+snapshot.forEach(doc=>{
+
+let data=doc.data()
+
+let row=table.insertRow()
+
+row.insertCell(0).innerText=doc.id
+row.insertCell(1).innerText=data.username
+row.insertCell(2).innerText=data.usd
+row.insertCell(3).innerText=data.bx
+
+})
+
+updateUsersChart(snapshot)
+
+})
+
+}
+
+// رسم المستخدمين
+const usersChart=LightweightCharts.createChart(document.getElementById('usersChart'),{
+width:600,
+height:300,
+layout:{background:{color:'#111827'},textColor:'#DDD'}
+})
+
+const usdSeries=usersChart.addLineSeries({color:'lime'})
+const bxSeries=usersChart.addLineSeries({color:'orange'})
+
+function updateUsersChart(snapshot){
+
+let usd=[]
+let bx=[]
+let t=1
+
+snapshot.forEach(doc=>{
+
+let d=doc.data()
+
+usd.push({time:t,value:d.usd})
+bx.push({time:t,value:d.bx})
+
+t++
+
+})
+
+usdSeries.setData(usd)
+bxSeries.setData(bx)
+
+}
+
+createChart()
+startTimer()
+loadUsers()
 
 </script>
 
