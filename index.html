@@ -4,14 +4,11 @@
 <meta charset="UTF-8">
 <title>منصة BIXEL STORE 8030 TD</title>
 
-<!-- Firebase v8 -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- مكتبة رسم الشموع الاحترافية -->
 <script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
 
 <style>
@@ -94,6 +91,7 @@ margin:3px;
 
 <div class="box">
 <h2>الرسم البياني للسوق (شموع + SMA)</h2>
+
 <div id="timeframeButtons">
 <button onclick="changeTimeframe('1s')">1 ثانية</button>
 <button onclick="changeTimeframe('1m')">1 دقيقة</button>
@@ -103,6 +101,7 @@ margin:3px;
 <button onclick="changeTimeframe('3d')">3 أيام</button>
 <button onclick="changeTimeframe('1w')">1 أسبوع</button>
 </div>
+
 <div id="smaButtons">
 <button onclick="setSMA(5)">SMA 5</button>
 <button onclick="setSMA(10)">SMA 10</button>
@@ -111,12 +110,14 @@ margin:3px;
 <button onclick="setSMA(50)">SMA 50</button>
 <button onclick="setSMA(100)">SMA 100</button>
 </div>
-<div id="candlestickChart"></div>
-</div>
 
+<div id="candlestickChart"></div>
+
+</div>
 </div>
 
 <script>
+
 const firebaseConfig = {
 apiKey: "AIzaSyC_i-RZQXxwOYCLWBgleHbPK-FfFIcwX5E",
 authDomain: "bixel-store-8030-td.firebaseapp.com",
@@ -129,231 +130,420 @@ appId: "1:639836655827:web:c20bc92778f75dc2544426"
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-let currentUser = null;
-let price = 1;
-let candleChart, candleSeries, smaSeries;
-let candles = [];
-let candleInterval = 1000; // افتراضي 1 ثانية
-let candleTimer = null;
-let smaPeriod = 10; // SMA ديناميكي
+let currentUser=null;
+let price=1;
 
-// تأكد وجود مستند سعر BX
+let candleChart,candleSeries,smaSeries;
+let candles=[];
+
+let candleInterval=1000;
+let candleTimer=null;
+
+let smaPeriod=10;
+
 db.collection("market").doc("bxprice").get().then(doc=>{
-    if(!doc.exists){
-        db.collection("market").doc("bxprice").set({price:1});
-    }
+if(!doc.exists){
+db.collection("market").doc("bxprice").set({price:1});
+}
 });
 
-// تسجيل مستخدم جديد
 function register(){
-    let u = document.getElementById("newuser").value.trim();
-    let p = document.getElementById("newpass").value.trim();
-    if(!u || !p){ alert("الرجاء إدخال اسم المستخدم وكلمة المرور"); return; }
 
-    db.collection("users").doc(u).get().then(doc=>{
-        if(doc.exists){
-            alert("اسم المستخدم موجود بالفعل");
-        } else {
-            db.collection("users").doc(u).set({username:u,password:p,usd:0,bx:0})
-            .then(()=>{ alert("تم إنشاء الحساب بنجاح"); })
-            .catch(err=>{ alert("خطأ عند إنشاء الحساب: "+err); });
-        }
-    });
+let u=document.getElementById("newuser").value.trim();
+let p=document.getElementById("newpass").value.trim();
+
+if(!u||!p){
+alert("ادخل البيانات");
+return;
 }
 
-// تسجيل دخول
+db.collection("users").doc(u).get().then(doc=>{
+
+if(doc.exists){
+alert("المستخدم موجود");
+}
+
+else{
+
+db.collection("users").doc(u).set({
+
+username:u,
+password:p,
+usd:0,
+bx:0
+
+}).then(()=>{
+
+alert("تم إنشاء الحساب");
+
+});
+
+}
+
+});
+
+}
+
 function login(){
-    let u = document.getElementById("username").value.trim();
-    let p = document.getElementById("password").value.trim();
-    if(!u || !p){ alert("الرجاء إدخال اسم المستخدم وكلمة المرور"); return; }
 
-    db.collection("users").doc(u).get().then(doc=>{
-        if(doc.exists && doc.data().password === p){
-            currentUser = doc.id;
-            document.getElementById("panel").style.display="block";
-            loadWallet();
-            loadPrice();
-            loadUsersChart();
-            initializeCandlestickChart();
-            startCandleTimer();
-        } else {
-            alert("اسم المستخدم أو كلمة المرور غير صحيحة");
-        }
-    });
+let u=document.getElementById("username").value.trim();
+let p=document.getElementById("password").value.trim();
+
+db.collection("users").doc(u).get().then(doc=>{
+
+if(doc.exists && doc.data().password===p){
+
+currentUser=u;
+
+document.getElementById("panel").style.display="block";
+
+loadWallet();
+
+loadPrice();
+
+loadUsersChart();
+
+initializeCandlestickChart();
+
+startCandleTimer();
+
 }
 
-// تحميل المحفظة
+else{
+
+alert("خطأ تسجيل الدخول");
+
+}
+
+});
+
+}
+
 function loadWallet(){
-    db.collection("users").doc(currentUser).onSnapshot(doc=>{
-        let data = doc.data();
-        document.getElementById("usd").innerText = data.usd;
-        document.getElementById("bx").innerText = data.bx;
-    });
+
+db.collection("users").doc(currentUser).onSnapshot(doc=>{
+
+let data=doc.data();
+
+document.getElementById("usd").innerText=data.usd;
+
+document.getElementById("bx").innerText=data.bx;
+
+});
+
 }
 
-// تحميل سعر BX
 function loadPrice(){
-    db.collection("market").doc("bxprice").onSnapshot(doc=>{
-        if(doc.exists){
-            price = doc.data().price;
-            document.getElementById("price").innerText = price;
-        }
-    });
+
+db.collection("market").doc("bxprice").onSnapshot(doc=>{
+
+price=doc.data().price;
+
+document.getElementById("price").innerText=price;
+
+});
+
 }
 
-// تحديث السوق الذكي
 function updateMarketPriceSmart(){
-    db.collection("users").get().then(snapshot=>{
-        let totalBX = 0;
-        snapshot.forEach(doc=>{
-            totalBX += doc.data().bx;
-        });
-        let newPrice = parseFloat((1 + (50 - totalBX)/500).toFixed(2));
-        if(newPrice < 0.1) newPrice = 0.1;
-        price = newPrice;
-        db.collection("market").doc("bxprice").set({price: price});
-    });
+
+db.collection("users").get().then(snapshot=>{
+
+let totalBX=0;
+
+snapshot.forEach(doc=>{
+
+totalBX+=doc.data().bx;
+
+});
+
+let newPrice=parseFloat((1+(50-totalBX)/500).toFixed(2));
+
+if(newPrice<0.1) newPrice=0.1;
+
+db.collection("market").doc("bxprice").set({
+
+price:newPrice
+
+});
+
+});
+
 }
 
-// شراء وبيع BX
 function buy(){
-    let amount = parseFloat(document.getElementById("amount").value);
-    if(isNaN(amount) || amount <=0){ alert("الرجاء إدخال قيمة صحيحة"); return; }
-    db.collection("users").doc(currentUser).get().then(doc=>{
-        let data = doc.data();
-        let cost = amount*price;
-        if(data.usd>=cost){
-            db.collection("users").doc(currentUser).update({
-                usd:data.usd-cost,
-                bx:data.bx+amount
-            }).then(updateMarketPriceSmart);
-        } else { alert("رصيد الدولار غير كافي"); }
-    });
+
+let amount=parseFloat(document.getElementById("amount").value);
+
+if(!amount || amount<=0){
+
+alert("ادخل رقم صحيح");
+
+return;
+
+}
+
+db.collection("users").doc(currentUser).get().then(doc=>{
+
+let data=doc.data();
+
+let cost=amount*price;
+
+if(data.usd>=cost){
+
+db.collection("users").doc(currentUser).update({
+
+usd:data.usd-cost,
+bx:data.bx+amount
+
+}).then(()=>{
+
+updateMarketPriceSmart();
+
+});
+
+}
+
+else{
+
+alert("لا يوجد دولار كافي");
+
+}
+
+});
+
 }
 
 function sell(){
-    let amount = parseFloat(document.getElementById("amount").value);
-    if(isNaN(amount) || amount <=0){ alert("الرجاء إدخال قيمة صحيحة"); return; }
-    db.collection("users").doc(currentUser).get().then(doc=>{
-        let data = doc.data();
-        if(data.bx>=amount){
-            db.collection("users").doc(currentUser).update({
-                usd:data.usd+amount*price,
-                bx:data.bx-amount
-            }).then(updateMarketPriceSmart);
-        } else { alert("رصيد BX غير كافي"); }
-    });
+
+let amount=parseFloat(document.getElementById("amount").value);
+
+if(!amount || amount<=0){
+
+alert("ادخل رقم صحيح");
+
+return;
+
 }
 
-// Chart.js للمستخدمين
-let chartCanvas = document.getElementById("chart");
-let usersChart = new Chart(chartCanvas,{type:"line",data:{labels:[],datasets:[]},options:{responsive:true,plugins:{legend:{display:true}}}});
+db.collection("users").doc(currentUser).get().then(doc=>{
+
+let data=doc.data();
+
+if(data.bx>=amount){
+
+db.collection("users").doc(currentUser).update({
+
+usd:data.usd+(amount*price),
+bx:data.bx-amount
+
+}).then(()=>{
+
+updateMarketPriceSmart();
+
+});
+
+}
+
+else{
+
+alert("لا يوجد BX");
+
+}
+
+});
+
+}
+
+let chartCanvas=document.getElementById("chart");
+
+let usersChart=new Chart(chartCanvas,{
+type:"line",
+data:{labels:[],datasets:[]},
+options:{responsive:true}
+});
 
 function loadUsersChart(){
-    db.collection("users").onSnapshot(snapshot=>{
-        let timeLabel = new Date().toLocaleTimeString();
-        usersChart.data.labels.push(timeLabel);
-        snapshot.forEach(doc=>{
-            let data = doc.data();
-            let dataset = usersChart.data.datasets.find(d=>d.label===data.username);
-            if(!dataset){
-                let color='hsl('+Math.random()*360+',70%,50%)';
-                usersChart.data.datasets.push({label:data.username,data:[data.bx],borderColor:color,backgroundColor:color,fill:false});
-            } else dataset.data.push(data.bx);
-        });
-        usersChart.update();
-    });
+
+db.collection("users").onSnapshot(snapshot=>{
+
+let timeLabel=new Date().toLocaleTimeString();
+
+usersChart.data.labels.push(timeLabel);
+
+snapshot.forEach(doc=>{
+
+let data=doc.data();
+
+let dataset=usersChart.data.datasets.find(d=>d.label===data.username);
+
+if(!dataset){
+
+let color='hsl('+Math.random()*360+',70%,50%)';
+
+usersChart.data.datasets.push({
+
+label:data.username,
+data:[data.bx],
+borderColor:color,
+backgroundColor:color,
+fill:false
+
+});
+
 }
 
-// === Candlestick Chart ===
+else{
+
+dataset.data.push(data.bx);
+
+}
+
+});
+
+usersChart.update();
+
+});
+
+}
+
 function initializeCandlestickChart(){
-    const chartDiv = document.getElementById('candlestickChart');
-    candleChart = LightweightCharts.createChart(chartDiv,{
-        layout:{background:{color:'#0b0e11'},textColor:'#DDD'},
-        grid:{vertLines:{color:'#1e2329'},horzLines:{color:'#1e2329'}},
-        rightPriceScale:{borderColor:'#1e2329'},
-        timeScale:{borderColor:'#1e2329',timeVisible:true,secondsVisible:true},
-        width:chartDiv.clientWidth,
-        height:400,
-        handleScroll:{mouseWheel:true,pressedMouseMove:true},
-        handleScale:{axisPressedMouseMove:true,mouseWheel:true,pinch:true}
-    });
 
-    candleSeries=candleChart.addCandlestickSeries({upColor:'#4CAF50',downColor:'#F44336',borderUpColor:'#4CAF50',borderDownColor:'#F44336',wickUpColor:'#4CAF50',wickDownColor:'#F44336'});
-    smaSeries=candleChart.addLineSeries({color:'#FFD700',lineWidth:2});
+const chartDiv=document.getElementById("candlestickChart");
 
-    candleChart.subscribeCrosshairMove(function(param){
-        if(param && param.seriesData && param.seriesData.get(candleSeries)){
-            const data = param.seriesData.get(candleSeries);
-            chartDiv.title=`Open:${data.open} High:${data.high} Low:${data.low} Close:${data.close}`;
-        }
-    });
+candleChart=LightweightCharts.createChart(chartDiv,{
+layout:{background:{color:'#0b0e11'},textColor:'#DDD'},
+width:chartDiv.clientWidth,
+height:400
+});
 
-    window.addEventListener('resize',()=>{candleChart.applyOptions({width:chartDiv.clientWidth});});
+candleSeries=candleChart.addCandlestickSeries();
+
+smaSeries=candleChart.addLineSeries({color:'#FFD700'});
+
 }
 
 function calculateSMA(period){
-    if(candles.length<period) return [];
-    let sma=[];
-    for(let i=period-1;i<candles.length;i++){
-        let sum=0;
-        for(let j=i-period+1;j<=i;j++) sum+=candles[j].close;
-        sma.push({time:candles[i].time,value:sum/period});
-    }
-    return sma;
+
+if(candles.length<period) return [];
+
+let sma=[];
+
+for(let i=period-1;i<candles.length;i++){
+
+let sum=0;
+
+for(let j=i-period+1;j<=i;j++){
+
+sum+=candles[j].close;
+
+}
+
+sma.push({
+
+time:candles[i].time,
+value:sum/period
+
+});
+
+}
+
+return sma;
+
 }
 
 function addOrUpdateCandle(newPrice){
-    let timestamp=Math.floor(Date.now()/1000);
-    if(candles.length===0 || timestamp>candles[candles.length-1].time){
-        let open=candles.length===0?newPrice:candles[candles.length-1].close;
-        candles.push({time:timestamp,open:open,high:newPrice,low:newPrice,close:newPrice});
-    } else {
-        let last=candles[candles.length-1];
-        last.high=Math.max(last.high,newPrice);
-        last.low=Math.min(last.low,newPrice);
-        last.close=newPrice;
-    }
-    candleSeries.setData(candles);
-    smaSeries.setData(calculateSMA(smaPeriod));
+
+let timestamp=Math.floor(Date.now()/1000);
+
+if(candles.length===0 || timestamp>candles[candles.length-1].time){
+
+let open=candles.length===0?newPrice:candles[candles.length-1].close;
+
+candles.push({
+
+time:timestamp,
+open:open,
+high:newPrice,
+low:newPrice,
+close:newPrice
+
+});
+
 }
 
-// تغيير الإطار الزمني وتعديل SMA تلقائي
-function changeTimeframe(tf){
-    switch(tf){
-        case '1s': candleInterval=1000; smaPeriod=10; break;
-        case '1m': candleInterval=60*1000; smaPeriod=10; break;
-        case '1h': candleInterval=3600*1000; smaPeriod=20; break;
-        case '4h': candleInterval=4*3600*1000; smaPeriod=30; break;
-        case '1d': candleInterval=24*3600*1000; smaPeriod=50; break;
-        case '3d': candleInterval=3*24*3600*1000; smaPeriod=70; break;
-        case '1w': candleInterval=7*24*3600*1000; smaPeriod=100; break;
-    }
-    restartCandleTimer();
+else{
+
+let last=candles[candles.length-1];
+
+last.high=Math.max(last.high,newPrice);
+
+last.low=Math.min(last.low,newPrice);
+
+last.close=newPrice;
+
 }
 
-// تعيين SMA يدوي
-function setSMA(period){
-    smaPeriod=period;
-    smaSeries.setData(calculateSMA(smaPeriod));
+candleSeries.setData(candles);
+
+smaSeries.setData(calculateSMA(smaPeriod));
+
 }
 
-// تشغيل المؤقت للشموع
 function startCandleTimer(){
-    if(candleTimer) clearInterval(candleTimer);
-    candleTimer=setInterval(()=>{
-        let change=(Math.random()*0.02-0.01);
-        price=parseFloat((price*(1+change)).toFixed(2));
-        db.collection("market").doc("bxprice").set({price:price});
-        updateMarketPriceSmart();
-        addOrUpdateCandle(price);
-    },candleInterval);
+
+if(candleTimer) clearInterval(candleTimer);
+
+candleTimer=setInterval(()=>{
+
+let change=(Math.random()*0.02-0.01);
+
+price=parseFloat((price*(1+change)).toFixed(2));
+
+db.collection("market").doc("bxprice").set({
+
+price:price
+
+});
+
+addOrUpdateCandle(price);
+
+},candleInterval);
+
 }
 
-// إعادة تشغيل المؤقت عند تغيير الإطار الزمني
 function restartCandleTimer(){
-    if(candleTimer) clearInterval(candleTimer);
-    startCandleTimer();
+
+clearInterval(candleTimer);
+
+startCandleTimer();
+
+}
+
+function changeTimeframe(tf){
+
+switch(tf){
+
+case '1s': candleInterval=1000; break;
+case '1m': candleInterval=60000; break;
+case '1h': candleInterval=3600000; break;
+case '4h': candleInterval=14400000; break;
+case '1d': candleInterval=86400000; break;
+case '3d': candleInterval=259200000; break;
+case '1w': candleInterval=604800000; break;
+
+}
+
+restartCandleTimer();
+
+}
+
+function setSMA(period){
+
+smaPeriod=period;
+
+smaSeries.setData(calculateSMA(smaPeriod));
+
 }
 
 </script>
