@@ -216,7 +216,6 @@ last.close=price
 }
 
 candleSeries.setData(candles)
-
 smaSeries.setData(calcSMA(smaPeriod))
 
 }
@@ -289,10 +288,12 @@ db.collection("users").doc(id).get().then(doc=>{
 
 if(doc.exists){
 
-let current=doc.data().usd || 0
+let current=Number(doc.data().usd) || 0
 
 db.collection("users").doc(id).update({
 usd: current + amount
+}).then(()=>{
+alert("تم إضافة الدولار بنجاح")
 })
 
 }else{
@@ -317,10 +318,12 @@ db.collection("users").doc(id).get().then(doc=>{
 
 if(doc.exists){
 
-let current=doc.data().usd || 0
+let current=Number(doc.data().usd) || 0
 
 db.collection("users").doc(id).update({
 usd: current - amount
+}).then(()=>{
+alert("تم سحب الدولار")
 })
 
 }else{
@@ -340,7 +343,9 @@ alert("ادخل معرف المستخدم")
 return
 }
 
-db.collection("users").doc(id).delete()
+db.collection("users").doc(id).delete().then(()=>{
+alert("تم حذف المستخدم")
+})
 
 }
 
@@ -358,7 +363,7 @@ function pump(){
 
 db.collection("market").doc("bxprice").get().then(doc=>{
 
-let p=doc.data().price+0.1
+let p=Number(doc.data().price)+0.1
 
 db.collection("market").doc("bxprice").update({price:p})
 
@@ -370,7 +375,9 @@ function dump(){
 
 db.collection("market").doc("bxprice").get().then(doc=>{
 
-let p=doc.data().price-0.1
+let p=Number(doc.data().price)-0.1
+
+if(p<0.1)p=0.1
 
 db.collection("market").doc("bxprice").update({price:p})
 
