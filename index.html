@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>BIXEL STORE 8030 TD</title>
+<title>منصة BIXEL STORE 8030 TD</title>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
@@ -12,14 +12,15 @@
 <style>
 
 body{
-background:#0f172a;
+background:#0b0e11;
 color:white;
-font-family:Arial;
+font-family:Tahoma;
 text-align:center;
+direction:rtl;
 }
 
 .box{
-background:#1e293b;
+background:#1e2329;
 padding:20px;
 margin:20px;
 border-radius:10px;
@@ -28,12 +29,15 @@ border-radius:10px;
 input{
 padding:10px;
 margin:5px;
+width:200px;
 }
 
 button{
 padding:10px;
 margin:5px;
 cursor:pointer;
+background:#f0b90b;
+border:none;
 }
 
 </style>
@@ -41,16 +45,27 @@ cursor:pointer;
 
 <body>
 
-<h1>BIXEL STORE 8030 TD</h1>
+<h1>منصة BIXEL STORE 8030 TD</h1>
 
 <div class="box">
 
-<h2>Login</h2>
+<h2>تسجيل الدخول</h2>
 
-<input id="username" placeholder="username"><br>
-<input id="password" type="password" placeholder="password"><br>
+<input id="username" placeholder="اسم المستخدم"><br>
+<input id="password" type="password" placeholder="كلمة المرور"><br>
 
-<button onclick="login()">Login</button>
+<button onclick="login()">دخول</button>
+
+</div>
+
+<div class="box">
+
+<h2>إنشاء حساب جديد</h2>
+
+<input id="newuser" placeholder="اسم المستخدم"><br>
+<input id="newpass" placeholder="كلمة المرور"><br>
+
+<button onclick="register()">تسجيل</button>
 
 </div>
 
@@ -58,31 +73,31 @@ cursor:pointer;
 
 <div class="box">
 
-<h2>Wallet</h2>
+<h2>المحفظة</h2>
 
-USD : <span id="usd">0</span><br>
-BX : <span id="bx">0</span><br>
-BX PRICE : <span id="price">0</span>
+الدولار: <span id="usd">0</span><br>
+عملة BX: <span id="bx">0</span><br>
+سعر BX: <span id="price">0</span>
 
 </div>
 
 <div class="box">
 
-<h2>Trade</h2>
+<h2>التداول</h2>
 
-<input id="amount" placeholder="amount">
+<input id="amount" placeholder="عدد عملة BX">
 
 <br>
 
-<button onclick="buy()">BUY BX</button>
+<button onclick="buy()">شراء BX</button>
 
-<button onclick="sell()">SELL BX</button>
+<button onclick="sell()">بيع BX</button>
 
 </div>
 
 <div class="box">
 
-<h2>Chart</h2>
+<h2>الرسم البياني</h2>
 
 <canvas id="chart"></canvas>
 
@@ -93,12 +108,12 @@ BX PRICE : <span id="price">0</span>
 <script>
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC_i-RZQXxwOYCLWBgleHbPK-FfFIcwX5E",
-  authDomain: "bixel-store-8030-td.firebaseapp.com",
-  projectId: "bixel-store-8030-td",
-  storageBucket: "bixel-store-8030-td.firebasestorage.app",
-  messagingSenderId: "639836655827",
-  appId: "1:639836655827:web:c20bc92778f75dc2544426"
+apiKey: "AIzaSyC_i-RZQXxwOYCLWBgleHbPK-FfFIcwX5E",
+authDomain: "bixel-store-8030-td.firebaseapp.com",
+projectId: "bixel-store-8030-td",
+storageBucket: "bixel-store-8030-td.firebasestorage.app",
+messagingSenderId: "639836655827",
+appId: "1:639836655827:web:c20bc92778f75dc2544426"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -107,6 +122,24 @@ const db = firebase.firestore();
 
 let currentUser=null;
 let price=1;
+
+function register(){
+
+let u=document.getElementById("newuser").value
+let p=document.getElementById("newpass").value
+
+db.collection("users").add({
+
+username:u,
+password:p,
+usd:0,
+bx:0
+
+})
+
+alert("تم إنشاء الحساب")
+
+}
 
 function login(){
 
@@ -217,7 +250,7 @@ type:"line",
 data:{
 labels:[],
 datasets:[{
-label:"BX PRICE",
+label:"BX",
 data:[]
 }]
 }
@@ -238,5 +271,4 @@ loadPrice()
 </script>
 
 </body>
-
 </html>
