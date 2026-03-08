@@ -4,34 +4,37 @@
 <meta charset="UTF-8">
 <title>منصة BIXEL STORE 8030 TD</title>
 
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+<!-- Firebase v8 -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<style>
+<!-- مكتبة رسم الشموع الاحترافية -->
+<script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
 
+<style>
 body{
 background:#0b0e11;
 color:white;
 font-family:Tahoma;
 text-align:center;
 direction:rtl;
+margin:0;
+padding:0;
 }
-
 .box{
 background:#1e2329;
 padding:20px;
 margin:20px;
 border-radius:10px;
 }
-
 input{
 padding:10px;
 margin:5px;
 width:200px;
 }
-
 button{
 padding:10px;
 margin:5px;
@@ -39,7 +42,14 @@ cursor:pointer;
 background:#f0b90b;
 border:none;
 }
-
+#candlestickChart{
+width: 100%; 
+height: 400px;
+}
+#timeframeButtons button, #smaButtons button{
+padding:5px 10px;
+margin:3px;
+}
 </style>
 </head>
 
@@ -48,65 +58,65 @@ border:none;
 <h1>منصة BIXEL STORE 8030 TD</h1>
 
 <div class="box">
-
 <h2>تسجيل الدخول</h2>
-
 <input id="username" placeholder="اسم المستخدم"><br>
 <input id="password" type="password" placeholder="كلمة المرور"><br>
-
 <button onclick="login()">دخول</button>
-
 </div>
 
 <div class="box">
-
 <h2>إنشاء حساب جديد</h2>
-
 <input id="newuser" placeholder="اسم المستخدم"><br>
-<input id="newpass" placeholder="كلمة المرور"><br>
-
+<input id="newpass" type="password" placeholder="كلمة المرور"><br>
 <button onclick="register()">تسجيل</button>
-
 </div>
 
 <div id="panel" style="display:none">
 
 <div class="box">
-
 <h2>المحفظة</h2>
-
 الدولار: <span id="usd">0</span><br>
 عملة BX: <span id="bx">0</span><br>
 سعر BX: <span id="price">0</span>
-
 </div>
 
 <div class="box">
-
 <h2>التداول</h2>
-
-<input id="amount" placeholder="عدد عملة BX">
-
-<br>
-
+<input id="amount" placeholder="عدد عملة BX"><br>
 <button onclick="buy()">شراء BX</button>
-
 <button onclick="sell()">بيع BX</button>
-
 </div>
 
 <div class="box">
-
-<h2>الرسم البياني</h2>
-
+<h2>الرسم البياني (BX لكل مستخدم)</h2>
 <canvas id="chart"></canvas>
+</div>
 
+<div class="box">
+<h2>الرسم البياني للسوق (شموع + SMA)</h2>
+<div id="timeframeButtons">
+<button onclick="changeTimeframe('1s')">1 ثانية</button>
+<button onclick="changeTimeframe('1m')">1 دقيقة</button>
+<button onclick="changeTimeframe('1h')">1 ساعة</button>
+<button onclick="changeTimeframe('4h')">4 ساعات</button>
+<button onclick="changeTimeframe('1d')">1 يوم</button>
+<button onclick="changeTimeframe('3d')">3 أيام</button>
+<button onclick="changeTimeframe('1w')">1 أسبوع</button>
+</div>
+<div id="smaButtons">
+<button onclick="setSMA(5)">SMA 5</button>
+<button onclick="setSMA(10)">SMA 10</button>
+<button onclick="setSMA(20)">SMA 20</button>
+<button onclick="setSMA(30)">SMA 30</button>
+<button onclick="setSMA(50)">SMA 50</button>
+<button onclick="setSMA(100)">SMA 100</button>
+</div>
+<div id="candlestickChart"></div>
 </div>
 
 </div>
 
 <script>
-
 const firebaseConfig = {
 apiKey: "AIzaSyC_i-RZQXxwOYCLWBgleHbPK-FfFIcwX5E",
 authDomain: "bixel-store-8030-td.firebaseapp.com",
@@ -117,156 +127,234 @@ appId: "1:639836655827:web:c20bc92778f75dc2544426"
 };
 
 firebase.initializeApp(firebaseConfig);
-
 const db = firebase.firestore();
 
-let currentUser=null;
-let price=1;
+let currentUser = null;
+let price = 1;
+let candleChart, candleSeries, smaSeries;
+let candles = [];
+let candleInterval = 1000; // افتراضي 1 ثانية
+let candleTimer = null;
+let smaPeriod = 10; // SMA ديناميكي
 
+// تأكد وجود مستند سعر BX
+db.collection("market").doc("bxprice").get().then(doc=>{
+    if(!doc.exists){
+        db.collection("market").doc("bxprice").set({price:1});
+    }
+});
+
+// تسجيل مستخدم جديد
 function register(){
+    let u = document.getElementById("newuser").value.trim();
+    let p = document.getElementById("newpass").value.trim();
+    if(!u || !p){ alert("الرجاء إدخال اسم المستخدم وكلمة المرور"); return; }
 
-let u=document.getElementById("newuser").value
-let p=document.getElementById("newpass").value
-
-db.collection("users").add({
-
-username:u,
-password:p,
-usd:0,
-bx:0
-
-})
-
-alert("تم إنشاء الحساب")
-
+    db.collection("users").doc(u).get().then(doc=>{
+        if(doc.exists){
+            alert("اسم المستخدم موجود بالفعل");
+        } else {
+            db.collection("users").doc(u).set({username:u,password:p,usd:0,bx:0})
+            .then(()=>{ alert("تم إنشاء الحساب بنجاح"); })
+            .catch(err=>{ alert("خطأ عند إنشاء الحساب: "+err); });
+        }
+    });
 }
 
+// تسجيل دخول
 function login(){
+    let u = document.getElementById("username").value.trim();
+    let p = document.getElementById("password").value.trim();
+    if(!u || !p){ alert("الرجاء إدخال اسم المستخدم وكلمة المرور"); return; }
 
-let u=document.getElementById("username").value
-let p=document.getElementById("password").value
-
-db.collection("users").get().then(snapshot=>{
-
-snapshot.forEach(doc=>{
-
-let data=doc.data()
-
-if(data.username==u && data.password==p){
-
-currentUser=doc.id
-
-document.getElementById("panel").style.display="block"
-
-loadWallet()
-
+    db.collection("users").doc(u).get().then(doc=>{
+        if(doc.exists && doc.data().password === p){
+            currentUser = doc.id;
+            document.getElementById("panel").style.display="block";
+            loadWallet();
+            loadPrice();
+            loadUsersChart();
+            initializeCandlestickChart();
+            startCandleTimer();
+        } else {
+            alert("اسم المستخدم أو كلمة المرور غير صحيحة");
+        }
+    });
 }
 
-})
-
-})
-
-}
-
+// تحميل المحفظة
 function loadWallet(){
-
-db.collection("users").doc(currentUser).onSnapshot(doc=>{
-
-let data=doc.data()
-
-document.getElementById("usd").innerText=data.usd
-document.getElementById("bx").innerText=data.bx
-
-})
-
+    db.collection("users").doc(currentUser).onSnapshot(doc=>{
+        let data = doc.data();
+        document.getElementById("usd").innerText = data.usd;
+        document.getElementById("bx").innerText = data.bx;
+    });
 }
 
+// تحميل سعر BX
 function loadPrice(){
-
-db.collection("market").doc("bxprice").onSnapshot(doc=>{
-
-price=doc.data().price
-
-document.getElementById("price").innerText=price
-
-updateChart(price)
-
-})
-
+    db.collection("market").doc("bxprice").onSnapshot(doc=>{
+        if(doc.exists){
+            price = doc.data().price;
+            document.getElementById("price").innerText = price;
+        }
+    });
 }
 
+// تحديث السوق الذكي
+function updateMarketPriceSmart(){
+    db.collection("users").get().then(snapshot=>{
+        let totalBX = 0;
+        snapshot.forEach(doc=>{
+            totalBX += doc.data().bx;
+        });
+        let newPrice = parseFloat((1 + (50 - totalBX)/500).toFixed(2));
+        if(newPrice < 0.1) newPrice = 0.1;
+        price = newPrice;
+        db.collection("market").doc("bxprice").set({price: price});
+    });
+}
+
+// شراء وبيع BX
 function buy(){
-
-let amount=parseFloat(document.getElementById("amount").value)
-
-db.collection("users").doc(currentUser).get().then(doc=>{
-
-let data=doc.data()
-
-let cost=amount*price
-
-if(data.usd>=cost){
-
-db.collection("users").doc(currentUser).update({
-
-usd:data.usd-cost,
-bx:data.bx+amount
-
-})
-
-}
-
-})
-
+    let amount = parseFloat(document.getElementById("amount").value);
+    if(isNaN(amount) || amount <=0){ alert("الرجاء إدخال قيمة صحيحة"); return; }
+    db.collection("users").doc(currentUser).get().then(doc=>{
+        let data = doc.data();
+        let cost = amount*price;
+        if(data.usd>=cost){
+            db.collection("users").doc(currentUser).update({
+                usd:data.usd-cost,
+                bx:data.bx+amount
+            }).then(updateMarketPriceSmart);
+        } else { alert("رصيد الدولار غير كافي"); }
+    });
 }
 
 function sell(){
-
-let amount=parseFloat(document.getElementById("amount").value)
-
-db.collection("users").doc(currentUser).get().then(doc=>{
-
-let data=doc.data()
-
-if(data.bx>=amount){
-
-db.collection("users").doc(currentUser).update({
-
-usd:data.usd+(amount*price),
-bx:data.bx-amount
-
-})
-
+    let amount = parseFloat(document.getElementById("amount").value);
+    if(isNaN(amount) || amount <=0){ alert("الرجاء إدخال قيمة صحيحة"); return; }
+    db.collection("users").doc(currentUser).get().then(doc=>{
+        let data = doc.data();
+        if(data.bx>=amount){
+            db.collection("users").doc(currentUser).update({
+                usd:data.usd+amount*price,
+                bx:data.bx-amount
+            }).then(updateMarketPriceSmart);
+        } else { alert("رصيد BX غير كافي"); }
+    });
 }
 
-})
+// Chart.js للمستخدمين
+let chartCanvas = document.getElementById("chart");
+let usersChart = new Chart(chartCanvas,{type:"line",data:{labels:[],datasets:[]},options:{responsive:true,plugins:{legend:{display:true}}}});
 
+function loadUsersChart(){
+    db.collection("users").onSnapshot(snapshot=>{
+        let timeLabel = new Date().toLocaleTimeString();
+        usersChart.data.labels.push(timeLabel);
+        snapshot.forEach(doc=>{
+            let data = doc.data();
+            let dataset = usersChart.data.datasets.find(d=>d.label===data.username);
+            if(!dataset){
+                let color='hsl('+Math.random()*360+',70%,50%)';
+                usersChart.data.datasets.push({label:data.username,data:[data.bx],borderColor:color,backgroundColor:color,fill:false});
+            } else dataset.data.push(data.bx);
+        });
+        usersChart.update();
+    });
 }
 
-let chart=new Chart(document.getElementById("chart"),{
+// === Candlestick Chart ===
+function initializeCandlestickChart(){
+    const chartDiv = document.getElementById('candlestickChart');
+    candleChart = LightweightCharts.createChart(chartDiv,{
+        layout:{background:{color:'#0b0e11'},textColor:'#DDD'},
+        grid:{vertLines:{color:'#1e2329'},horzLines:{color:'#1e2329'}},
+        rightPriceScale:{borderColor:'#1e2329'},
+        timeScale:{borderColor:'#1e2329',timeVisible:true,secondsVisible:true},
+        width:chartDiv.clientWidth,
+        height:400,
+        handleScroll:{mouseWheel:true,pressedMouseMove:true},
+        handleScale:{axisPressedMouseMove:true,mouseWheel:true,pinch:true}
+    });
 
-type:"line",
+    candleSeries=candleChart.addCandlestickSeries({upColor:'#4CAF50',downColor:'#F44336',borderUpColor:'#4CAF50',borderDownColor:'#F44336',wickUpColor:'#4CAF50',wickDownColor:'#F44336'});
+    smaSeries=candleChart.addLineSeries({color:'#FFD700',lineWidth:2});
 
-data:{
-labels:[],
-datasets:[{
-label:"BX",
-data:[]
-}]
+    candleChart.subscribeCrosshairMove(function(param){
+        if(param && param.seriesData && param.seriesData.get(candleSeries)){
+            const data = param.seriesData.get(candleSeries);
+            chartDiv.title=`Open:${data.open} High:${data.high} Low:${data.low} Close:${data.close}`;
+        }
+    });
+
+    window.addEventListener('resize',()=>{candleChart.applyOptions({width:chartDiv.clientWidth});});
 }
 
-})
-
-function updateChart(p){
-
-chart.data.labels.push("t")
-chart.data.datasets[0].data.push(p)
-
-chart.update()
-
+function calculateSMA(period){
+    if(candles.length<period) return [];
+    let sma=[];
+    for(let i=period-1;i<candles.length;i++){
+        let sum=0;
+        for(let j=i-period+1;j<=i;j++) sum+=candles[j].close;
+        sma.push({time:candles[i].time,value:sum/period});
+    }
+    return sma;
 }
 
-loadPrice()
+function addOrUpdateCandle(newPrice){
+    let timestamp=Math.floor(Date.now()/1000);
+    if(candles.length===0 || timestamp>candles[candles.length-1].time){
+        let open=candles.length===0?newPrice:candles[candles.length-1].close;
+        candles.push({time:timestamp,open:open,high:newPrice,low:newPrice,close:newPrice});
+    } else {
+        let last=candles[candles.length-1];
+        last.high=Math.max(last.high,newPrice);
+        last.low=Math.min(last.low,newPrice);
+        last.close=newPrice;
+    }
+    candleSeries.setData(candles);
+    smaSeries.setData(calculateSMA(smaPeriod));
+}
+
+// تغيير الإطار الزمني وتعديل SMA تلقائي
+function changeTimeframe(tf){
+    switch(tf){
+        case '1s': candleInterval=1000; smaPeriod=10; break;
+        case '1m': candleInterval=60*1000; smaPeriod=10; break;
+        case '1h': candleInterval=3600*1000; smaPeriod=20; break;
+        case '4h': candleInterval=4*3600*1000; smaPeriod=30; break;
+        case '1d': candleInterval=24*3600*1000; smaPeriod=50; break;
+        case '3d': candleInterval=3*24*3600*1000; smaPeriod=70; break;
+        case '1w': candleInterval=7*24*3600*1000; smaPeriod=100; break;
+    }
+    restartCandleTimer();
+}
+
+// تعيين SMA يدوي
+function setSMA(period){
+    smaPeriod=period;
+    smaSeries.setData(calculateSMA(smaPeriod));
+}
+
+// تشغيل المؤقت للشموع
+function startCandleTimer(){
+    if(candleTimer) clearInterval(candleTimer);
+    candleTimer=setInterval(()=>{
+        let change=(Math.random()*0.02-0.01);
+        price=parseFloat((price*(1+change)).toFixed(2));
+        db.collection("market").doc("bxprice").set({price:price});
+        updateMarketPriceSmart();
+        addOrUpdateCandle(price);
+    },candleInterval);
+}
+
+// إعادة تشغيل المؤقت عند تغيير الإطار الزمني
+function restartCandleTimer(){
+    if(candleTimer) clearInterval(candleTimer);
+    startCandleTimer();
+}
 
 </script>
 
