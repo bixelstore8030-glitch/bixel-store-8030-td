@@ -6,7 +6,6 @@
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
 
@@ -84,7 +83,7 @@ margin:3px;
 </div>
 
 <div class="box">
-<h2>الرسم البياني (BX لكل مستخدم)</h2>
+<h2>الرسم البياني لكل مستخدم</h2>
 <canvas id="chart"></canvas>
 </div>
 
@@ -111,11 +110,9 @@ margin:3px;
 </div>
 
 <div id="candlestickChart"></div>
-
 </div>
 
 <script>
-
 const firebaseConfig = {
 apiKey: "AIzaSyC_i-RZQXxwOYCLWBgleHbPK-FfFIcwX5E",
 authDomain: "bixel-store-8030-td.firebaseapp.com",
@@ -124,27 +121,24 @@ storageBucket: "bixel-store-8030-td.firebasestorage.app",
 messagingSenderId: "639836655827",
 appId: "1:639836655827:web:c20bc92778f75dc2544426"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 let currentUser=null;
 let price=1;
 
-let candleChart,candleSeries,smaSeries;
-let candles=[];
+// ---- الشموع + SMA ----
+let candleChart,candleSeries,smaSeries,candles=[],candleInterval=1000,candleTimer=null,smaPeriod=10;
 
-let candleInterval=1000;
-let candleTimer=null;
-
-let smaPeriod=10;
-
-db.collection("market").doc("bxprice").get().then(doc=>{
-if(!doc.exists){
-db.collection("market").doc("bxprice").set({price:1});
-}
+// ---- رسم المستخدمين ----
+let chartCanvas=document.getElementById("chart");
+let usersChart=new Chart(chartCanvas,{
+type:"line",
+data:{labels:[],datasets:[]},
+options:{responsive:true}
 });
 
+// ---- تسجيل المستخدم ----
 function register(){
 let u=document.getElementById("newuser").value.trim();
 let p=document.getElementById("newpass").value.trim();
@@ -152,16 +146,12 @@ if(!u||!p){ alert("ادخل البيانات"); return; }
 db.collection("users").doc(u).get().then(doc=>{
 if(doc.exists){ alert("المستخدم موجود"); }
 else{
-db.collection("users").doc(u).set({
-username:u,
-password:p,
-usd:0,
-bx:0
-}).then(()=>{ alert("تم إنشاء الحساب"); });
+db.collection("users").doc(u).set({username:u,password:p,usd:0,bx:0}).then(()=>{ alert("تم إنشاء الحساب"); });
 }
 });
 }
 
+// ---- تسجيل الدخول ----
 function login(){
 let u=document.getElementById("username").value.trim();
 let p=document.getElementById("password").value.trim();
@@ -179,7 +169,7 @@ else{ alert("خطأ تسجيل الدخول"); }
 });
 }
 
-/* تحديث المحفظة مباشرة عند أي تعديل في Firestore باستخدام increment */
+// ---- تحديث المحفظة مباشرة ----
 function loadWallet(){
 if(!currentUser) return;
 db.collection("users").doc(currentUser).onSnapshot(doc=>{
@@ -191,6 +181,7 @@ document.getElementById("bx").innerText=data.bx;
 });
 }
 
+// ---- تحديث سعر السوق ----
 function loadPrice(){
 db.collection("market").doc("bxprice").onSnapshot(doc=>{
 if(doc.exists){
@@ -200,17 +191,7 @@ document.getElementById("price").innerText=price;
 });
 }
 
-function updateMarketPriceSmart(){
-db.collection("users").get().then(snapshot=>{
-let totalBX=0;
-snapshot.forEach(doc=>{ totalBX+=doc.data().bx; });
-let newPrice=parseFloat((1+(50-totalBX)/500).toFixed(2));
-if(newPrice<0.1) newPrice=0.1;
-db.collection("market").doc("bxprice").set({price:newPrice});
-});
-}
-
-/* شراء باستخدام increment */
+// ---- شراء وبيع ----
 function buy(){
 let amount=parseFloat(document.getElementById("amount").value);
 if(!amount || amount<=0){ alert("ادخل رقم صحيح"); return; }
@@ -226,7 +207,6 @@ bx: firebase.firestore.FieldValue.increment(amount)
 });
 }
 
-/* بيع باستخدام increment */
 function sell(){
 let amount=parseFloat(document.getElementById("amount").value);
 if(!amount || amount<=0){ alert("ادخل رقم صحيح"); return; }
@@ -241,14 +221,18 @@ bx: firebase.firestore.FieldValue.increment(-amount)
 });
 }
 
-/* الرسم البياني لكل مستخدم */
-let chartCanvas=document.getElementById("chart");
-let usersChart=new Chart(chartCanvas,{
-type:"line",
-data:{labels:[],datasets:[]},
-options:{responsive:true}
+// ---- تحديث السعر الذكي ----
+function updateMarketPriceSmart(){
+db.collection("users").get().then(snapshot=>{
+let totalBX=0;
+snapshot.forEach(doc=>{ totalBX+=doc.data().bx; });
+let newPrice=parseFloat((1+(50-totalBX)/500).toFixed(2));
+if(newPrice<0.1) newPrice=0.1;
+db.collection("market").doc("bxprice").set({price:newPrice});
 });
+}
 
+// ---- رسم بياني لكل مستخدم ----
 function loadUsersChart(){
 db.collection("users").onSnapshot(snapshot=>{
 let timeLabel=new Date().toLocaleTimeString();
@@ -258,27 +242,17 @@ let data=doc.data();
 let dataset=usersChart.data.datasets.find(d=>d.label===data.username);
 if(!dataset){
 let color='hsl('+Math.random()*360+',70%,50%)';
-usersChart.data.datasets.push({
-label:data.username,
-data:[data.bx],
-borderColor:color,
-backgroundColor:color,
-fill:false
-});
+usersChart.data.datasets.push({label:data.username,data:[data.bx],borderColor:color,backgroundColor:color,fill:false});
 }else{ dataset.data.push(data.bx); }
 });
 usersChart.update();
 });
 }
 
-/* الرسم البياني للسوق (شموع + SMA) */
+// ---- الشموع + SMA ----
 function initializeCandlestickChart(){
 const chartDiv=document.getElementById("candlestickChart");
-candleChart=LightweightCharts.createChart(chartDiv,{
-layout:{background:{color:'#0b0e11'},textColor:'#DDD'},
-width:chartDiv.clientWidth,
-height:400
-});
+candleChart=LightweightCharts.createChart(chartDiv,{layout:{background:{color:'#0b0e11'},textColor:'#DDD'},width:chartDiv.clientWidth,height:400});
 candleSeries=candleChart.addCandlestickSeries();
 smaSeries=candleChart.addLineSeries({color:'#FFD700'});
 }
@@ -313,10 +287,7 @@ function startCandleTimer(){
 if(candleTimer) clearInterval(candleTimer);
 candleTimer=setInterval(()=>{
 db.collection("market").doc("bxprice").get().then(doc=>{
-if(doc.exists){
-let currentPrice=doc.data().price;
-addOrUpdateCandle(currentPrice);
-}
+if(doc.exists){ addOrUpdateCandle(doc.data().price); }
 });
 },candleInterval);
 }
@@ -343,7 +314,6 @@ function setSMA(period){
 smaPeriod=period;
 smaSeries.setData(calculateSMA(smaPeriod));
 }
-
 </script>
 
 </body>
