@@ -116,7 +116,7 @@ let candles=[];
 let lastCandleTime=0;
 let candleDuration=5;
 
-let marketInterval=null; // حركة السوق
+let marketInterval=null;
 
 function register(){
 
@@ -172,10 +172,10 @@ currentUser=u;
 document.getElementById("panel").style.display="block";
 
 loadWallet();
-loadPrice();
+listenPrice();   // 👈 هنا التعديل المهم
 startChart();
 loadCandles();
-startMarketMovement(); // تشغيل حركة السوق الضعيفة
+startMarketMovement();
 
 });
 
@@ -194,22 +194,20 @@ document.getElementById("bx").innerText=parseFloat(d.bx).toFixed(6);
 
 }
 
-function loadPrice(){
+function listenPrice(){
 
-db.ref("market/bxprice").get().then(snap=>{
+db.ref("market/bxprice").on("value",snap=>{
 
 if(!snap.exists()){
-
 db.ref("market/bxprice").set(1);
-price=1;
-
-}else{
+return;
+}
 
 price=snap.val();
 
-}
-
 document.getElementById("price").innerText=price.toFixed(2);
+
+updateCandle(price);
 
 });
 
@@ -217,16 +215,12 @@ document.getElementById("price").innerText=price.toFixed(2);
 
 function loadCandles(){
 
-db.ref("market/candles").get().then(snap=>{
+db.ref("market/candles").once("value").then(snap=>{
 
 if(snap.exists()){
 
 candles=snap.val();
 candleSeries.setData(candles);
-
-}else{
-
-updateCandle(price);
 
 }
 
@@ -241,6 +235,7 @@ db.ref("market/candles").set(candles);
 function buy(){
 
 let amount=parseFloat(document.getElementById("amount").value);
+if(!amount)return;
 
 db.ref("users/"+currentUser).transaction(user=>{
 
@@ -249,25 +244,20 @@ if(!user)return user;
 let cost=amount*price;
 
 if(user.usd<cost){
-
 alert("لا يوجد دولار كافي");
 return user;
-
 }
 
 user.usd=parseFloat((user.usd-cost).toFixed(2));
 user.bx=parseFloat((user.bx+amount).toFixed(6));
 
-price=Math.min(price+0.05,price+amount/2000);
-
-document.getElementById("price").innerText=price.toFixed(2);
-
-updateCandle(price);
-
-db.ref("market/bxprice").set(price);
-
 return user;
 
+});
+
+db.ref("market/bxprice").transaction(p=>{
+if(!p)p=1;
+return p + (amount/2000);
 });
 
 }
@@ -275,31 +265,27 @@ return user;
 function sell(){
 
 let amount=parseFloat(document.getElementById("amount").value);
+if(!amount)return;
 
 db.ref("users/"+currentUser).transaction(user=>{
 
 if(!user)return user;
 
 if(user.bx<amount){
-
 alert("لا يوجد BX كافي");
 return user;
-
 }
 
 user.bx=parseFloat((user.bx-amount).toFixed(6));
 user.usd=parseFloat((user.usd+amount*price).toFixed(2));
 
-price=Math.max(0.1,price-0.05);
-
-document.getElementById("price").innerText=price.toFixed(2);
-
-updateCandle(price);
-
-db.ref("market/bxprice").set(price);
-
 return user;
 
+});
+
+db.ref("market/bxprice").transaction(p=>{
+if(!p)p=1;
+return Math.max(0.1,p-(amount/2000));
 });
 
 }
@@ -310,15 +296,15 @@ if(marketInterval) clearInterval(marketInterval);
 
 marketInterval=setInterval(()=>{
 
-let delta=(Math.random()*0.02)-0.01; // بين -0.01 و +0.01
+db.ref("market/bxprice").transaction(p=>{
 
-price=Math.max(0.1,price+delta);
+if(!p)p=1;
 
-document.getElementById("price").innerText=price.toFixed(2);
+let delta=(Math.random()*0.02)-0.01;
 
-updateCandle(price);
+return Math.max(0.1,p+delta);
 
-db.ref("market/bxprice").set(price);
+});
 
 },2000);
 
@@ -401,4 +387,3 @@ document.getElementById("sellBtn").onclick=sell;
 
 </body>
 </html>
-
