@@ -116,8 +116,6 @@ let candles=[];
 let lastCandleTime=0;
 let candleDuration=5;
 
-let marketInterval=null;
-
 function register(){
 
 let u=document.getElementById("newuser").value.trim();
@@ -172,10 +170,9 @@ currentUser=u;
 document.getElementById("panel").style.display="block";
 
 loadWallet();
-listenPrice();   // 👈 هنا التعديل المهم
+listenPrice();
 startChart();
 loadCandles();
-startMarketMovement();
 
 });
 
@@ -287,26 +284,6 @@ db.ref("market/bxprice").transaction(p=>{
 if(!p)p=1;
 return Math.max(0.1,p-(amount/2000));
 });
-
-}
-
-function startMarketMovement(){
-
-if(marketInterval) clearInterval(marketInterval);
-
-marketInterval=setInterval(()=>{
-
-db.ref("market/bxprice").transaction(p=>{
-
-if(!p)p=1;
-
-let delta=(Math.random()*0.02)-0.01;
-
-return Math.max(0.1,p+delta);
-
-});
-
-},2000);
 
 }
 
