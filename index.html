@@ -3,10 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <title>منصة BIXEL STORE 8030 TD</title>
+
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
+
 <style>
 body{
 background:#0b0e11;
@@ -17,17 +19,20 @@ direction:rtl;
 margin:0;
 padding:0;
 }
+
 .box{
 background:#1e2329;
 padding:20px;
 margin:20px;
 border-radius:10px;
 }
+
 input{
 padding:10px;
 margin:5px;
 width:200px;
 }
+
 button{
 padding:10px;
 margin:5px;
@@ -35,12 +40,14 @@ cursor:pointer;
 background:#f0b90b;
 border:none;
 }
+
 #candlestickChart{
 width:100%;
 height:400px;
 }
 </style>
 </head>
+
 <body>
 
 <h1>منصة BIXEL STORE</h1>
@@ -60,6 +67,7 @@ height:400px;
 </div>
 
 <div id="panel" style="display:none">
+
 <div class="box">
 <h2>المحفظة</h2>
 الدولار: <span id="usd">0</span><br>
@@ -80,33 +88,12 @@ BX: <span id="bx">0</span><br>
 </div>
 
 <div class="box">
-<h2>مؤشرات السوق</h2>
-<button id="sma5Btn">SMA5</button>
-<button id="sma10Btn">SMA10</button>
-<button id="sma20Btn">SMA20</button>
-<button id="sma50Btn">SMA50</button>
-<button id="rsiBtn">RSI</button>
-<button id="bollingerBtn">Bollinger</button>
-</div>
-
-<div class="box">
 <h2>الرسم البياني للسوق</h2>
 <div id="candlestickChart"></div>
 </div>
 
-<div class="box">
-<h2>تصحيح الشمعة</h2>
-<button id="adjSecondBtn">-1 ثانية</button>
-<button id="adjMinuteBtn">-1 دقيقة</button>
-<button id="adjHourBtn">-1 ساعة</button>
-<button id="adj4HourBtn">-4 ساعات</button>
-<button id="adjDayBtn">-1 يوم</button>
-<button id="adj4DayBtn">-4 أيام</button>
-<button id="adjWeekBtn">-1 أسبوع</button>
-</div>
-
 <script>
-// ======= إعداد Firebase =======
+
 const firebaseConfig={
 apiKey:"AIzaSyC_i-RZQXxwOYCLWBgleHbPK-FfFIcwX5E",
 authDomain:"bixel-store-8030-td.firebaseapp.com",
@@ -116,287 +103,300 @@ storageBucket:"bixel-store-8030-td.firebasestorage.app",
 messagingSenderId:"639836655827",
 appId:"1:639836655827:web:c20bc92778f75dc2544426"
 };
+
 firebase.initializeApp(firebaseConfig);
 const db=firebase.database();
 
-// ======= المتغيرات =======
 let currentUser=null;
 let price=1;
+
 let chart;
 let candleSeries;
-let smaSeries;
 let candles=[];
 let lastCandleTime=0;
 let candleDuration=5;
-let smaPeriod=10;
-let usersChart=null;
-let userDatasets={};
-let marketInterval=null;
 
-// ====== دوال SMA ======
-function calculateSMA(period){
-if(candles.length<period) return [];
-let r=[];
-for(let i=period-1;i<candles.length;i++){
-let sum=0;
-for(let j=i-period+1;j<=i;j++) sum+=candles[j].close;
-r.push({time:candles[i].time,value:sum/period});
-}
-return r;
-}
+let marketInterval=null; // حركة السوق
 
-// ====== تعديل الشمعة ======
-function adjustCandle(type){
-if(candles.length===0) return;
-let last = candles[candles.length-1];
-let sec=0;
-switch(type){
-case 'second': sec=1; break;
-case 'minute': sec=60; break;
-case 'hour': sec=3600; break;
-case '4hour': sec=14400; break;
-case 'day': sec=86400; break;
-case '4day': sec=345600; break;
-case 'week': sec=604800; break;
-}
-let minTime = candles.length > 1 ? candles[candles.length-2].time + 1 : last.time - sec;
-last.time = Math.max(minTime, last.time - sec);
-last.close = Math.max(last.close, 0.1);
-candleSeries.setData(candles);
-smaSeries.setData(calculateSMA(smaPeriod));
-saveCandlesToDB();
-savePriceToDB();
-}
-
-// ====== مؤشرات ======
-function setSMA(p){smaPeriod=p; smaSeries.setData(calculateSMA(p));}
-function toggleRSI(){alert("سيتم إضافة RSI لاحقاً");}
-function toggleBollinger(){alert("سيتم إضافة Bollinger لاحقاً");}
-
-// ====== تسجيل مستخدم ======
 function register(){
+
 let u=document.getElementById("newuser").value.trim();
 let p=document.getElementById("newpass").value.trim();
-if(!u||!p){alert("ادخل البيانات");return;}
-db.ref("users/"+u).get().then(snap=>{
-if(snap.exists()){alert("المستخدم موجود");return;}
-db.ref("users/"+u).set({username:u,password:p,usd:100,bx:0,chartData:[]});
-alert("تم إنشاء الحساب");
-});
+
+if(!u||!p){
+alert("ادخل البيانات");
+return;
 }
 
-// ====== تسجيل الدخول ======
+db.ref("users/"+u).get().then(snap=>{
+
+if(snap.exists()){
+alert("المستخدم موجود");
+return;
+}
+
+db.ref("users/"+u).set({
+username:u,
+password:p,
+usd:100,
+bx:0
+});
+
+alert("تم إنشاء الحساب");
+
+});
+
+}
+
 function login(){
+
 let u=document.getElementById("username").value.trim();
 let p=document.getElementById("password").value.trim();
-if(!u || !p){alert("ادخل اسم المستخدم وكلمة المرور"); return;}
+
 db.ref("users/"+u).get().then(snap=>{
-if(!snap.exists()){alert("المستخدم غير موجود"); return;}
-let data = snap.val();
-if(data.password !== p){alert("كلمة المرور خطأ"); return;}
-currentUser = u;
+
+if(!snap.exists()){
+alert("المستخدم غير موجود");
+return;
+}
+
+let data=snap.val();
+
+if(data.password!==p){
+alert("كلمة المرور خطأ");
+return;
+}
+
+currentUser=u;
+
 document.getElementById("panel").style.display="block";
+
 loadWallet();
 loadPrice();
-loadUsersChart();
-startMarketChart();
-loadCandlesFromDB(); 
-loadUserChartData();
-startMarketMovement(); // تشغيل تحرك السوق التلقائي
+startChart();
+loadCandles();
+startMarketMovement(); // تشغيل حركة السوق الضعيفة
+
 });
+
 }
 
-// ====== تحميل المحفظة ======
 function loadWallet(){
-if(!currentUser) return;
+
 db.ref("users/"+currentUser).on("value",snap=>{
-if(!snap.exists()) return;
+
 let d=snap.val();
-document.getElementById("usd").innerText = d.usd || 0;
-document.getElementById("bx").innerText = d.bx || 0;
+
+document.getElementById("usd").innerText=parseFloat(d.usd).toFixed(2);
+document.getElementById("bx").innerText=parseFloat(d.bx).toFixed(6);
+
 });
+
 }
 
-// ====== تحميل سعر BX ======
 function loadPrice(){
+
 db.ref("market/bxprice").get().then(snap=>{
-if(!snap.exists()){db.ref("market/bxprice").set(1); price=1;}
-else price = snap.val();
-document.getElementById("price").innerText = price.toFixed(2);
-if(candles.length===0) updateCandle(price);
-});
+
+if(!snap.exists()){
+
+db.ref("market/bxprice").set(1);
+price=1;
+
+}else{
+
+price=snap.val();
+
 }
 
-// ====== حفظ السعر والشموع ======
-function savePriceToDB(){ db.ref("market/bxprice").set(price); }
-function saveCandlesToDB(){ db.ref("market/candles").set(candles); }
-function loadCandlesFromDB(){
+document.getElementById("price").innerText=price.toFixed(2);
+
+});
+
+}
+
+function loadCandles(){
+
 db.ref("market/candles").get().then(snap=>{
+
 if(snap.exists()){
-candles = snap.val();
-lastCandleTime = candles.length>0 ? candles[candles.length-1].time : Math.floor(Date.now()/1000);
-if(candleSeries) candleSeries.setData(candles);
-if(smaSeries) smaSeries.setData(calculateSMA(smaPeriod));
-}
-});
+
+candles=snap.val();
+candleSeries.setData(candles);
+
+}else{
+
+updateCandle(price);
+
 }
 
-// ====== شراء وبيع مع تحريك السعر المحدود فقط ======
-function buy(){
-if(!currentUser) return alert("سجل الدخول أولاً");
-let amount=parseFloat(document.getElementById("amount").value);
-if(!amount) return;
-db.ref("users/"+currentUser).transaction(user=>{
-if(!user) return user;
-let cost = amount * price;
-if(user.usd < cost){alert("لا يوجد دولار كافي"); return user;}
-user.usd -= cost;
-user.bx += amount;
-price = Math.min(price + 0.05, price + amount/2000); // تحريك السعر بعد الشراء أضعف
-document.getElementById("price").innerText = price.toFixed(2);
-updateCandle(price);
-saveUserChartPoint(currentUser,user.bx);
-savePriceToDB();
-saveCandlesToDB();
-return user;
 });
+
+}
+
+function saveCandles(){
+db.ref("market/candles").set(candles);
+}
+
+function buy(){
+
+let amount=parseFloat(document.getElementById("amount").value);
+
+db.ref("users/"+currentUser).transaction(user=>{
+
+if(!user)return user;
+
+let cost=amount*price;
+
+if(user.usd<cost){
+
+alert("لا يوجد دولار كافي");
+return user;
+
+}
+
+user.usd=parseFloat((user.usd-cost).toFixed(2));
+user.bx=parseFloat((user.bx+amount).toFixed(6));
+
+price=Math.min(price+0.05,price+amount/2000);
+
+document.getElementById("price").innerText=price.toFixed(2);
+
+updateCandle(price);
+
+db.ref("market/bxprice").set(price);
+
+return user;
+
+});
+
 }
 
 function sell(){
-if(!currentUser) return alert("سجل الدخول أولاً");
+
 let amount=parseFloat(document.getElementById("amount").value);
-if(!amount) return;
+
 db.ref("users/"+currentUser).transaction(user=>{
-if(!user) return user;
-if(user.bx < amount){alert("لا يوجد BX كافي"); return user;}
-user.bx -= amount;
-user.usd += amount * price;
-price = Math.max(0.1, price - 0.05); // تحريك السعر بعد البيع أضعف
-document.getElementById("price").innerText = price.toFixed(2);
-updateCandle(price);
-saveUserChartPoint(currentUser,user.bx);
-savePriceToDB();
-saveCandlesToDB();
+
+if(!user)return user;
+
+if(user.bx<amount){
+
+alert("لا يوجد BX كافي");
 return user;
-});
+
 }
 
-// ====== حركة السوق التلقائية أضعف ======
-function startMarketMovement(){
-if(marketInterval) clearInterval(marketInterval);
-marketInterval = setInterval(()=>{
-let delta = (Math.random()*0.04) - 0.02; // يتحرك بين -0.02 و +0.02 بدل ±0.05
-price = Math.max(0.1, price + delta);
-document.getElementById("price").innerText = price.toFixed(2);
+user.bx=parseFloat((user.bx-amount).toFixed(6));
+user.usd=parseFloat((user.usd+amount*price).toFixed(2));
+
+price=Math.max(0.1,price-0.05);
+
+document.getElementById("price").innerText=price.toFixed(2);
+
 updateCandle(price);
-savePriceToDB();
-}, 1000);
-}
 
-// ====== بقية الكود كما هو ======
-function saveUserChartPoint(username,bxValue){
-let time = new Date().toLocaleTimeString();
-db.ref("users/"+username+"/chartData").push({time:time,bx:bxValue});
-}
+db.ref("market/bxprice").set(price);
 
-function loadUserChartData(){
-db.ref("users").once("value").then(snap=>{
-let users=snap.val(); if(!users) return;
-for(let k in users){
-let u = users[k];
-if(u.chartData){
-userDatasets[u.username]={label:u.username,data:[],borderWidth:2,fill:false};
-usersChart.data.datasets.push(userDatasets[u.username]);
-for(let pointKey in u.chartData){
-let point = u.chartData[pointKey];
-userDatasets[u.username].data.push(point.bx);
-usersChart.data.labels.push(point.time);
-}
-}
-}
-usersChart.update();
+return user;
+
 });
+
 }
 
-function loadUsersChart(){
-const ctx=document.getElementById("chart").getContext("2d");
-if(!usersChart){
-usersChart=new Chart(ctx,{
-type:"line",
-data:{labels:[],datasets:[]},
-options:{responsive:true,animation:false}
-});
-}
-db.ref("users").on("value",snap=>{
-let users=snap.val(); if(!users) return;
-let time=new Date().toLocaleTimeString();
-usersChart.data.labels.push(time);
-if(usersChart.data.labels.length>20) usersChart.data.labels.shift();
-for(let k in users){
-let u = users[k];
-if(!userDatasets[u.username]){
-let newDataset={label:u.username,data:Array(usersChart.data.labels.length-1).fill(0).concat([u.bx]),borderWidth:2,fill:false};
-usersChart.data.datasets.push(newDataset);
-userDatasets[u.username]=newDataset;
-}else{
-let ds = userDatasets[u.username];
-ds.data.push(u.bx);
-if(ds.data.length>20) ds.data.shift();
-}
-}
-usersChart.update();
-});
+function startMarketMovement(){
+
+if(marketInterval) clearInterval(marketInterval);
+
+marketInterval=setInterval(()=>{
+
+let delta=(Math.random()*0.02)-0.01; // بين -0.01 و +0.01
+
+price=Math.max(0.1,price+delta);
+
+document.getElementById("price").innerText=price.toFixed(2);
+
+updateCandle(price);
+
+db.ref("market/bxprice").set(price);
+
+},2000);
+
 }
 
-function startMarketChart(){
+function startChart(){
+
 const container=document.getElementById("candlestickChart");
-chart=LightweightCharts.createChart(container,{width:container.clientWidth,height:400,
-layout:{background:{color:"#0b0e11"},textColor:"#DDD"}});
+
+chart=LightweightCharts.createChart(container,{
+width:container.clientWidth,
+height:400,
+layout:{
+background:{color:"#0b0e11"},
+textColor:"#DDD"
+}
+});
+
 candleSeries=chart.addCandlestickSeries();
-smaSeries=chart.addLineSeries({color:"#FFD700"});
+
 }
 
 function updateCandle(newPrice){
+
 let time=Math.floor(Date.now()/1000);
+
 if(candles.length===0){
-candles.push({time:time,open:newPrice,high:newPrice,low:newPrice,close:newPrice});
+
+candles.push({
+time:time,
+open:newPrice,
+high:newPrice,
+low:newPrice,
+close:newPrice
+});
+
 lastCandleTime=time;
-} else {
-let last=candles[candles.length-1];
-if(time-lastCandleTime>=candleDuration){
-candles.push({time:time,open:last.close,high:newPrice,low:newPrice,close:newPrice});
-lastCandleTime=time;
+
 }else{
+
+let last=candles[candles.length-1];
+
+if(time-lastCandleTime>=candleDuration){
+
+candles.push({
+time:time,
+open:last.close,
+high:newPrice,
+low:newPrice,
+close:newPrice
+});
+
+lastCandleTime=time;
+
+}else{
+
 last.high=Math.max(last.high,newPrice);
 last.low=Math.min(last.low,newPrice);
 last.close=newPrice;
-}}
-candleSeries.setData(candles);
-smaSeries.setData(calculateSMA(smaPeriod));
-savePriceToDB();
-saveCandlesToDB();
+
 }
 
-// ====== ربط الأزرار ======
-window.onload = function(){
-document.getElementById("loginBtn").onclick = login;
-document.getElementById("registerBtn").onclick = register;
-document.getElementById("buyBtn").onclick = buy;
-document.getElementById("sellBtn").onclick = sell;
-document.getElementById("sma5Btn").onclick = ()=>setSMA(5);
-document.getElementById("sma10Btn").onclick = ()=>setSMA(10);
-document.getElementById("sma20Btn").onclick = ()=>setSMA(20);
-document.getElementById("sma50Btn").onclick = ()=>setSMA(50);
-document.getElementById("rsiBtn").onclick = toggleRSI;
-document.getElementById("bollingerBtn").onclick = toggleBollinger;
-document.getElementById("adjSecondBtn").onclick = ()=>adjustCandle('second');
-document.getElementById("adjMinuteBtn").onclick = ()=>adjustCandle('minute');
-document.getElementById("adjHourBtn").onclick = ()=>adjustCandle('hour');
-document.getElementById("adj4HourBtn").onclick = ()=>adjustCandle('4hour');
-document.getElementById("adjDayBtn").onclick = ()=>adjustCandle('day');
-document.getElementById("adj4DayBtn").onclick = ()=>adjustCandle('4day');
-document.getElementById("adjWeekBtn").onclick = ()=>adjustCandle('week');
-};
+}
+
+candleSeries.setData(candles);
+saveCandles();
+
+}
+
+window.onload=function(){
+
+document.getElementById("loginBtn").onclick=login;
+document.getElementById("registerBtn").onclick=register;
+document.getElementById("buyBtn").onclick=buy;
+document.getElementById("sellBtn").onclick=sell;
+
+}
+
 </script>
 
 </body>
