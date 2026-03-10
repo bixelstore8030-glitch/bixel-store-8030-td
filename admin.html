@@ -118,7 +118,7 @@ appId: "1:639836655827:web:c20bc92778f75dc2544426"
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let candleChart,candleSeries,smaSeries;
+let candleChart, candleSeries, smaSeries;
 let candles=[];
 let candleInterval=5000;
 let smaPeriod=10;
@@ -130,18 +130,22 @@ function createChart(){
 const chartDiv=document.getElementById("marketChart");
 candleChart=LightweightCharts.createChart(chartDiv,{
 layout:{background:{color:"#111827"},textColor:"#DDD"},
-grid:{vertLines:{color:"#1f2937"},horzLines:{color:"#1f2937"}},
-rightPriceScale:{borderColor:"#1f2937"},
-timeScale:{borderColor:"#1f2937",timeVisible:true,secondsVisible:true},
+grid:{vertLines:{color:'#1f2937'},horzLines:{color:'#1f2937'}},
+rightPriceScale:{borderColor:'#1f2937'},
+timeScale:{borderColor:'#1f2937',timeVisible:true,secondsVisible:true},
 width:chartDiv.clientWidth,
 height:400
 });
-candleSeries=candleChart.addCandlestickSeries({upColor:"#4CAF50",downColor:"#F44336",borderUpColor:"#4CAF50",borderDownColor:"#F44336",wickUpColor:"#4CAF50",wickDownColor:"#F44336"});
+candleSeries=candleChart.addCandlestickSeries({
+upColor:"#4bffb0", downColor:"#ff4976",
+borderUpColor:"#4bffb0", borderDownColor:"#ff4976",
+wickUpColor:"#4bffb0", wickDownColor:"#ff4976"
+});
 smaSeries=candleChart.addLineSeries({color:"#FFD700",lineWidth:2});
 window.addEventListener("resize",()=>{candleChart.applyOptions({width:chartDiv.clientWidth});});
 loadCandlesFromDB();
 loadPriceFromDB();
-startMarketMovement(); // تشغيل تحرك السوق التلقائي
+startMarketMovement();
 }
 
 // ====== حساب SMA ======
@@ -278,8 +282,7 @@ if(marketMoveInterval) clearInterval(marketMoveInterval);
 marketMoveInterval=setInterval(()=>{
 db.ref("market/bxprice").get().then(snapshot=>{
 let currentPrice=snapshot.exists()?snapshot.val():1;
-// تعديل الحركة لتصبح أضعف: ±0.02 بدل ±0.05
-let delta=(Math.random()*0.04)-0.02;
+let delta=(Math.random()*0.04)-0.02; // حركة أضعف ±0.02
 let newPrice=Math.max(0.1,currentPrice+delta);
 updateCandle(newPrice);
 db.ref("market/bxprice").set(newPrice);
