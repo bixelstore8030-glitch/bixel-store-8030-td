@@ -10,86 +10,125 @@
 <script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
 
 <style>
+
 body{
 background:#0b0e11;
 color:white;
 font-family:tahoma;
-text-align:center;
 direction:rtl;
 margin:0;
 padding:0;
+text-align:center;
+}
+
+h1{
+background:#11161c;
+padding:15px;
+margin:0;
 }
 
 .box{
 background:#1e2329;
 padding:20px;
-margin:20px;
+margin:15px;
 border-radius:10px;
+box-shadow:0 0 10px #000;
 }
 
 input{
 padding:10px;
 margin:5px;
 width:200px;
+border:none;
+border-radius:5px;
 }
 
 button{
-padding:10px;
+padding:10px 20px;
 margin:5px;
 cursor:pointer;
 background:#f0b90b;
 border:none;
+border-radius:5px;
+font-weight:bold;
+}
+
+button:hover{
+background:#ffd84d;
 }
 
 #candlestickChart{
 width:100%;
 height:400px;
 }
+
 </style>
 </head>
 
 <body>
 
-<h1>منصة BIXEL STORE</h1>
+<h1>BIXEL STORE 8030 TD</h1>
 
 <div class="box">
 <h2>تسجيل الدخول</h2>
-<input id="username" placeholder="اسم المستخدم"><br>
+
+<input list="savedUsers" id="username" placeholder="اسم المستخدم"><br>
+<datalist id="savedUsers"></datalist>
+
 <input id="password" type="password" placeholder="كلمة المرور"><br>
+
 <button id="loginBtn">دخول</button>
 </div>
 
 <div class="box">
 <h2>إنشاء حساب</h2>
+
 <input id="newuser" placeholder="اسم المستخدم"><br>
 <input id="newpass" type="password" placeholder="كلمة المرور"><br>
+
 <button id="registerBtn">تسجيل</button>
+
 </div>
 
 <div id="panel" style="display:none">
 
 <div class="box">
+
 <h2>المحفظة</h2>
+
 الدولار: <span id="usd">0</span><br>
 BX: <span id="bx">0</span><br>
 سعر BX: <span id="price">0</span>
+
 </div>
 
 <div class="box">
+
 <h2>التداول</h2>
+
 <input id="amount" placeholder="عدد BX"><br>
+
 <button id="buyBtn">شراء</button>
 <button id="sellBtn">بيع</button>
+
 </div>
 
 <div class="box">
+
 <h2>الرسم البياني للمستخدمين</h2>
+
 <canvas id="chart"></canvas>
+
 </div>
 
 <div class="box">
+
 <h2>الرسم البياني للسوق</h2>
+
 <div id="candlestickChart"></div>
+
+</div>
+
 </div>
 
 <script>
@@ -108,256 +147,239 @@ firebase.initializeApp(firebaseConfig);
 const db=firebase.database();
 
 let currentUser=null;
-let price=1;
+
+let price=0;
+let maxPrice=0;
+
+let chartUsers;
 
 let chart;
 let candleSeries;
+
 let candles=[];
 let lastCandleTime=0;
 let candleDuration=5;
 
-function register(){
+let marketStarted=false;
 
+
+
+function saveUsername(name){
+let users=JSON.parse(localStorage.getItem("users")||"[]");
+if(!users.includes(name)){
+users.push(name);
+localStorage.setItem("users",JSON.stringify(users));
+}
+}
+
+function loadSavedUsers(){
+let users=JSON.parse(localStorage.getItem("users")||"[]");
+let list=document.getElementById("savedUsers");
+users.forEach(u=>{
+let option=document.createElement("option");
+option.value=u;
+list.appendChild(option);
+});
+}
+
+function register(){
 let u=document.getElementById("newuser").value.trim();
 let p=document.getElementById("newpass").value.trim();
-
 if(!u||!p){
 alert("ادخل البيانات");
 return;
 }
-
 db.ref("users/"+u).get().then(snap=>{
-
 if(snap.exists()){
 alert("المستخدم موجود");
 return;
 }
-
 db.ref("users/"+u).set({
 username:u,
 password:p,
-usd:0,
+usd:100,
 bx:0
 });
-
 alert("تم إنشاء الحساب");
-
 });
-
 }
 
 function login(){
-
 let u=document.getElementById("username").value.trim();
 let p=document.getElementById("password").value.trim();
-
 db.ref("users/"+u).get().then(snap=>{
-
 if(!snap.exists()){
 alert("المستخدم غير موجود");
 return;
 }
-
 let data=snap.val();
-
 if(data.password!==p){
 alert("كلمة المرور خطأ");
 return;
 }
-
 currentUser=u;
-
+saveUsername(u);
 document.getElementById("panel").style.display="block";
-
 loadWallet();
-listenPrice();
 startChart();
 loadCandles();
-
+listenPrice();
+startUsersChart();
 });
-
 }
 
 function loadWallet(){
-
 db.ref("users/"+currentUser).on("value",snap=>{
-
 let d=snap.val();
-
 document.getElementById("usd").innerText=parseFloat(d.usd).toFixed(2);
 document.getElementById("bx").innerText=parseFloat(d.bx).toFixed(6);
-
 });
-
 }
 
+// تحسين دقة سعر السوق عند التحميل
 function listenPrice(){
+db.ref("market/bxprice").once("value").then(snap=>{
+if(!snap.exists()){
+price=0.10;
+maxPrice=0.10;
+db.ref("market/bxprice").set(0.10);
+}else{
+price=parseFloat(snap.val());
+maxPrice=price;
+}
+document.getElementById("price").innerText=price.toFixed(2);
+});
 
 db.ref("market/bxprice").on("value",snap=>{
-
-if(!snap.exists()){
-db.ref("market/bxprice").set(1);
-return;
-}
-
-price=snap.val();
-
+if(!snap.exists()) return;
+price=parseFloat(snap.val());
+if(price>maxPrice) maxPrice=price;
 document.getElementById("price").innerText=price.toFixed(2);
-
 updateCandle(price);
-
+if(!marketStarted){
+marketStarted=true;
+startMarket();
+}
 });
-
 }
 
-function loadCandles(){
-
-db.ref("market/candles").once("value").then(snap=>{
-
-if(snap.exists()){
-
-candles=snap.val();
-candleSeries.setData(candles);
-
-}
-
-});
-
-}
-
-function saveCandles(){
-db.ref("market/candles").set(candles);
+function startMarket(){
+setInterval(()=>{
+let move=(Math.random()>0.5?0.01:-0.01);
+let newPrice=price+move;
+if(newPrice>maxPrice)newPrice=maxPrice;
+if(newPrice<0.01)newPrice=0.01;
+db.ref("market/bxprice").set(parseFloat(newPrice.toFixed(2)));
+},5000);
 }
 
 function buy(){
-
 let amount=parseFloat(document.getElementById("amount").value);
 if(!amount)return;
-
 db.ref("users/"+currentUser).transaction(user=>{
-
 if(!user)return user;
-
 let cost=amount*price;
-
 if(user.usd<cost){
 alert("لا يوجد دولار كافي");
 return user;
 }
-
 user.usd=parseFloat((user.usd-cost).toFixed(2));
 user.bx=parseFloat((user.bx+amount).toFixed(6));
-
 return user;
-
 });
-
 db.ref("market/bxprice").transaction(p=>{
-if(!p)p=1;
-return p + (amount/2000);
+if(!p)p=price;
+let newPrice=p+(amount/2000);
+if(newPrice>maxPrice)maxPrice=newPrice;
+return parseFloat(newPrice.toFixed(2));
 });
-
 }
 
 function sell(){
-
 let amount=parseFloat(document.getElementById("amount").value);
 if(!amount)return;
-
 db.ref("users/"+currentUser).transaction(user=>{
-
 if(!user)return user;
-
 if(user.bx<amount){
 alert("لا يوجد BX كافي");
 return user;
 }
-
 user.bx=parseFloat((user.bx-amount).toFixed(6));
 user.usd=parseFloat((user.usd+amount*price).toFixed(2));
-
 return user;
-
 });
-
 db.ref("market/bxprice").transaction(p=>{
-if(!p)p=1;
-return Math.max(0.1,p-(amount/2000));
+if(!p)p=price;
+return Math.max(0.01,parseFloat((p-(amount/2000)).toFixed(2)));
 });
-
 }
 
+// رسم شموع السوق محسنة
 function startChart(){
-
 const container=document.getElementById("candlestickChart");
-
 chart=LightweightCharts.createChart(container,{
 width:container.clientWidth,
 height:400,
-layout:{
-background:{color:"#0b0e11"},
-textColor:"#DDD"
-}
+layout:{background:{color:"#0b0e11"},textColor:"#DDD"},
+grid:{vertLines:{color:'#333'},horzLines:{color:'#333'}},
+rightPriceScale:{borderColor:'#555'},
+timeScale:{borderColor:'#555',timeVisible:true,secondsVisible:true}
 });
-
-candleSeries=chart.addCandlestickSeries();
-
+candleSeries=chart.addCandlestickSeries({
+upColor: '#4bffb0', 
+borderUpColor: '#4bffb0', 
+wickUpColor: '#4bffb0',
+downColor: '#ff4976', 
+borderDownColor: '#ff4976', 
+wickDownColor: '#ff4976'
+});
 }
 
 function updateCandle(newPrice){
-
 let time=Math.floor(Date.now()/1000);
-
 if(candles.length===0){
-
-candles.push({
-time:time,
-open:newPrice,
-high:newPrice,
-low:newPrice,
-close:newPrice
-});
-
+candles.push({time:time,open:newPrice,high:newPrice,low:newPrice,close:newPrice});
 lastCandleTime=time;
-
 }else{
-
 let last=candles[candles.length-1];
-
 if(time-lastCandleTime>=candleDuration){
-
-candles.push({
-time:time,
-open:last.close,
-high:newPrice,
-low:newPrice,
-close:newPrice
-});
-
+candles.push({time:time,open:last.close,high:newPrice,low:newPrice,close:newPrice});
 lastCandleTime=time;
-
 }else{
-
 last.high=Math.max(last.high,newPrice);
 last.low=Math.min(last.low,newPrice);
 last.close=newPrice;
-
 }
-
 }
-
 candleSeries.setData(candles);
-saveCandles();
+db.ref("market/candles").set(candles);
+}
 
+function loadCandles(){
+db.ref("market/candles").once("value").then(snap=>{
+if(snap.exists()){
+candles=snap.val();
+candleSeries.setData(candles);
+}
+});
+}
+
+function startUsersChart(){
+let ctx=document.getElementById("chart").getContext("2d");
+chartUsers=new Chart(ctx,{type:"line",data:{labels:[],datasets:[{label:"حركة المستخدم",data:[],borderColor:"#f0b90b",fill:false}]}});
+setInterval(()=>{
+chartUsers.data.labels.push("");
+chartUsers.data.datasets[0].data.push(price);
+chartUsers.update();
+},5000);
 }
 
 window.onload=function(){
-
 document.getElementById("loginBtn").onclick=login;
 document.getElementById("registerBtn").onclick=register;
 document.getElementById("buyBtn").onclick=buy;
 document.getElementById("sellBtn").onclick=sell;
-
+loadSavedUsers();
 }
 
 </script>
