@@ -162,8 +162,6 @@ let candleDuration=5;
 
 let marketStarted=false;
 
-
-
 function saveUsername(name){
 let users=JSON.parse(localStorage.getItem("users")||"[]");
 if(!users.includes(name)){
@@ -220,6 +218,9 @@ return;
 currentUser=u;
 saveUsername(u);
 document.getElementById("panel").style.display="block";
+
+setTimeout(()=>{ if(chart) chart.timeScale().fitContent(); },500);
+
 loadWallet();
 startChart();
 loadCandles();
@@ -236,7 +237,6 @@ document.getElementById("bx").innerText=parseFloat(d.bx).toFixed(6);
 });
 }
 
-// تحسين دقة سعر السوق عند التحميل
 function listenPrice(){
 db.ref("market/bxprice").once("value").then(snap=>{
 if(!snap.exists()){
@@ -314,9 +314,12 @@ return Math.max(0.01,parseFloat((p-(amount/2000)).toFixed(2)));
 });
 }
 
-// رسم شموع السوق محسنة
+// ✅ FIXED CHART
 function startChart(){
 const container=document.getElementById("candlestickChart");
+
+setTimeout(()=>{
+
 chart=LightweightCharts.createChart(container,{
 width:container.clientWidth,
 height:400,
@@ -325,6 +328,7 @@ grid:{vertLines:{color:'#333'},horzLines:{color:'#333'}},
 rightPriceScale:{borderColor:'#555'},
 timeScale:{borderColor:'#555',timeVisible:true,secondsVisible:true}
 });
+
 candleSeries=chart.addCandlestickSeries({
 upColor: '#4bffb0', 
 borderUpColor: '#4bffb0', 
@@ -333,6 +337,18 @@ downColor: '#ff4976',
 borderDownColor: '#ff4976', 
 wickDownColor: '#ff4976'
 });
+
+window.addEventListener("resize",()=>{
+chart.applyOptions({
+width:container.clientWidth
+});
+});
+
+if(candles.length>0){
+candleSeries.setData(candles);
+}
+
+},300);
 }
 
 function updateCandle(newPrice){
@@ -351,7 +367,9 @@ last.low=Math.min(last.low,newPrice);
 last.close=newPrice;
 }
 }
+if(candleSeries){
 candleSeries.setData(candles);
+}
 db.ref("market/candles").set(candles);
 }
 
@@ -359,7 +377,9 @@ function loadCandles(){
 db.ref("market/candles").once("value").then(snap=>{
 if(snap.exists()){
 candles=snap.val();
+if(candleSeries){
 candleSeries.setData(candles);
+}
 }
 });
 }
